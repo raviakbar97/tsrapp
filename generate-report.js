@@ -120,11 +120,34 @@ function generateReport(specificJsonFile = null) {
       
       // Use manually entered MP fee if available, otherwise calculate it
       let mpFee;
-      if (order["MP Fee Manual"] && !isNaN(parseFloat(order["MP Fee Manual"]))) {
-        mpFee = parseFloat(order["MP Fee Manual"]);
-        console.log(`Using manually entered MP Fee: ${mpFee} for order ${orderNumber}`);
+      
+      // Debug logging to troubleshoot MP Fee Manual
+      console.log(`Order #${orderNumber} - MP Fee Manual:`, order["MP Fee Manual"]);
+      console.log(`Order #${orderNumber} - MP Fee Manual type:`, typeof order["MP Fee Manual"]);
+      
+      if (order["MP Fee Manual"] !== undefined && order["MP Fee Manual"] !== null) {
+        // Try to parse as number, handling various formats
+        let manualFee;
+        
+        if (typeof order["MP Fee Manual"] === 'string') {
+          // Remove any non-numeric characters except dots
+          const numericString = order["MP Fee Manual"].replace(/[^\d.]/g, '');
+          manualFee = parseFloat(numericString);
+        } else {
+          manualFee = parseFloat(order["MP Fee Manual"]);
+        }
+        
+        // Only use if it's a valid number
+        if (!isNaN(manualFee)) {
+          mpFee = manualFee;
+          console.log(`Order #${orderNumber} - Using manual MP Fee: ${mpFee}`);
+        } else {
+          mpFee = calculateMpFee(subtotal, productCategory);
+          console.log(`Order #${orderNumber} - Invalid manual MP Fee, using calculated: ${mpFee}`);
+        }
       } else {
         mpFee = calculateMpFee(subtotal, productCategory);
+        console.log(`Order #${orderNumber} - No manual MP Fee, using calculated: ${mpFee}`);
       }
       
       const earnings = subtotal - mpFee - voucher;

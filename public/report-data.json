@@ -1,8 +1,8 @@
 {
   "summary": {
-    "totalOrders": 283,
-    "totalEarnings": 74828516,
-    "averageMargin": 38.11042437351023
+    "totalOrders": 284,
+    "totalEarnings": 75738516,
+    "averageMargin": 38.21366793085833
   },
   "orders": [
     {
@@ -4249,6 +4249,21 @@
       "voucher": 0,
       "earnings": 4615000,
       "margin": 4615000
+    },
+    {
+      "orderDate": "2025-04-25T19:03:00.000Z",
+      "orderNumber": "123",
+      "productName": "Nagoya Plastic Cup Sealer / Penyegel Gelas Plastik | NGY-37CS 22oz",
+      "variationName": "Nagoya Plastic Cup Sealer / Penyegel Gelas Plastik | NGY-37CS 22oz",
+      "quantity": 1,
+      "basePrice": 485000,
+      "totalBasePrice": 485000,
+      "sellingPrice": 1000000,
+      "subtotal": 1000000,
+      "mpFee": 90000,
+      "voucher": 0,
+      "earnings": 910000,
+      "margin": 425000
     }
   ]
 }

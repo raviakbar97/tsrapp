@@ -2403,10 +2403,14 @@
         const platform = row.querySelector('.entry-platform').value;
         const productName = row.querySelector('.entry-product-name').value.trim();
         const variationName = row.querySelector('.entry-variation').value.trim();
-        const quantity = row.querySelector('.entry-quantity').value;
-        const price = row.querySelector('.entry-price').value;
-        const mpFee = row.querySelector('.entry-mpfee').value;
-        const voucher = row.querySelector('.entry-voucher').value;
+        
+        // Parse numeric values explicitly to ensure they're numbers, not strings
+        const quantity = parseInt(row.querySelector('.entry-quantity').value) || 1;
+        const price = parseFloat(row.querySelector('.entry-price').value) || 0;
+        const mpFee = parseFloat(row.querySelector('.entry-mpfee').value) || 0;
+        const voucher = parseFloat(row.querySelector('.entry-voucher').value) || 0;
+        
+        console.log(`Order ${orderNumber} - MP Fee (parsed): ${mpFee}, type: ${typeof mpFee}`);
         
         // Match the format expected by the backend (as in orderData.json)
         return {

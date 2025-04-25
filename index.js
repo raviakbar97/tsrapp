@@ -470,6 +470,14 @@ app.post('/manual-entry', upload.none(), (req, res) => {
     // Write JSON to file
     fs.writeFileSync(outputPath, JSON.stringify(finalData, null, 2));
     
+    // Log MP Fee Manual values for debugging
+    console.log('Manual entry MP Fee values:');
+    finalData.forEach(order => {
+      if (order["MP Fee Manual"] !== undefined) {
+        console.log(`Order ${order["No. Pesanan"]}: MP Fee Manual = ${order["MP Fee Manual"]} (${typeof order["MP Fee Manual"]})`);
+      }
+    });
+    
     // Automatically generate report using the newly created JSON file
     try {
       generateReport(outputPath);
