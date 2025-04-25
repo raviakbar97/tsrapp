@@ -714,6 +714,45 @@ app.get('/generate-report', (req, res) => {
   }
 });
 
+// Endpoint to refresh the report data
+app.get('/refresh-report', (req, res) => {
+  try {
+    // Check if orderData.json exists
+    const orderDataPath = path.join(__dirname, 'orderData.json');
+    if (!fs.existsSync(orderDataPath)) {
+      return res.status(404).json({ error: 'Order data file not found' });
+    }
+
+    // Read order data
+    const orderData = JSON.parse(fs.readFileSync(orderDataPath, 'utf8'));
+    
+    // Generate fresh report from order data
+    const reportData = generateReport(orderData.orders);
+    
+    // Save the regenerated report
+    const reportPath = path.join(__dirname, 'public', 'report-data.json');
+    
+    // Create a backup of the current report if it exists
+    if (fs.existsSync(reportPath)) {
+      const backupPath = path.join(__dirname, 'public', `report-data-backup-${Date.now()}.json`);
+      fs.copyFileSync(reportPath, backupPath);
+      console.log(`Created backup of report data at ${backupPath}`);
+    }
+    
+    // Write the new report data
+    fs.writeFileSync(reportPath, JSON.stringify(reportData, null, 2));
+    
+    return res.json({ 
+      success: true, 
+      message: 'Report refreshed successfully',
+      totalOrders: reportData.length
+    });
+  } catch (error) {
+    console.error('Error refreshing report:', error);
+    return res.status(500).json({ error: 'Failed to refresh report data' });
+  }
+});
+
 // Serve the product catalog and fee rules directly
 app.get('/products-catalog.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'products-catalog.json'));

@@ -1224,19 +1224,43 @@
       });
     }
     
-    function refreshReport() {
-      // Show loading state
-      const refreshBtn = document.getElementById('refresh-report');
-      refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...';
-      refreshBtn.disabled = true;
-      
-      // Simply reload the existing report-data.json - this is the only data source we need
-      loadReportData();
-      showToast('Report data refreshed!');
-      
-      // Reset button state
-      refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh Data';
-      refreshBtn.disabled = false;
+    async function refreshReport() {
+        try {
+            // Show loading spinner and disable refresh button
+            const refreshBtn = document.getElementById('refresh-btn');
+            const originalBtnText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...';
+            refreshBtn.disabled = true;
+            
+            showLoadingToast("Refreshing report data...");
+            
+            // Call the refresh-report endpoint instead of directly loading the file
+            const response = await fetch('/refresh-report');
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to refresh report');
+            }
+            
+            const result = await response.json();
+            
+            // Load the report data after the refresh
+            await loadReportData();
+            
+            showSuccessToast("Report refreshed successfully!");
+            
+            // Restore button state
+            refreshBtn.innerHTML = originalBtnText;
+            refreshBtn.disabled = false;
+        } catch (error) {
+            console.error("Error refreshing report:", error);
+            showErrorToast(`Failed to refresh report: ${error.message}`);
+            
+            // Restore button state on error as well
+            const refreshBtn = document.getElementById('refresh-btn');
+            refreshBtn.innerHTML = 'Refresh Report';
+            refreshBtn.disabled = false;
+        }
     }
     
     function showToast(message, type = 'success') {
