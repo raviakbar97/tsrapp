@@ -1238,7 +1238,7 @@
       refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...';
       refreshBtn.disabled = true;
       
-      // Instead of regenerating the report, just reload the existing report-data.json
+      // Simply reload the existing report-data.json - this is the only data source we need
       loadReportData();
       showToast('Report data refreshed!');
       
@@ -2525,14 +2525,14 @@
     // Add a regenerate function that will recreate the report from the original orderData.json
     function regenerateReport() {
       // Show confirmation first
-      if (!confirm("This will regenerate the report from the original order data, potentially undoing any edits made in the Simple Editor. Continue?")) {
+      if (!confirm("This will regenerate the report from the original order data (orderData.json), potentially undoing any edits made in the Simple Editor or manual entries. Continue?")) {
         return;
       }
       
       // Show loading state
-      const refreshBtn = document.getElementById('refresh-report');
-      refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Regenerating...';
-      refreshBtn.disabled = true;
+      const regenerateBtn = document.getElementById('regenerate-report');
+      regenerateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Regenerating...';
+      regenerateBtn.disabled = true;
       
       // Call the API to regenerate the report
       fetch('/generate-report')
@@ -2552,8 +2552,8 @@
         })
         .finally(() => {
           // Reset button state
-          refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh Data';
-          refreshBtn.disabled = false;
+          regenerateBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Regenerate Report';
+          regenerateBtn.disabled = false;
         });
     }
   </script>
