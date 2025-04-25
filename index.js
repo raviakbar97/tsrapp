@@ -410,9 +410,8 @@ app.post('/manual-entry', upload.none(), (req, res) => {
       });
     }
     
-    // Standard output filename
-    const outputFilename = 'orderData.json';
-    const outputPath = path.join(__dirname, outputFilename);
+    // Path to the report data file (not orderData.json)
+    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
     
     // Check if we should append or replace (default is replace)
     const shouldAppend = req.body.appendData === 'true';
@@ -421,29 +420,103 @@ app.post('/manual-entry', upload.none(), (req, res) => {
     const newDataCount = manualData.length;
     let existingDataCount = 0;
     let duplicateCount = 0;
-    let finalData = [];
+    
+    // Process the new entries directly into the report format
+    const processedEntries = [];
+    
+    manualData.forEach(entry => {
+      try {
+        // Extract data from entry
+        const orderDate = entry["Waktu Pembayaran Dilakukan"];
+        const orderNumber = entry["No. Pesanan"];
+        const productName = entry["Nama Produk"];
+        const variationName = entry["Nama Variasi"] || "";
+        const quantity = parseInt(entry["Jumlah"]) || 1;
+        const sellingPricePerUnit = parseFloat(entry["Harga Setelah Diskon"]) || 0;
+        const mpFee = parseFloat(entry["MP Fee Manual"]) || 0;
+        const voucher = parseFloat(entry["Voucher Ditanggung Penjual"]) || 0;
+        
+        // Get product category and base price from catalog
+        const productsCatalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'products-catalog.json'), 'utf8'));
+        
+        // Find base price
+        let basePrice = 0;
+        const product = productsCatalog.products.find(p => 
+          p.product_name === productName
+        );
+        
+        if (product) {
+          const variation = product.variations.find(v => 
+            v.name === variationName
+          );
+          
+          if (variation) {
+            basePrice = variation.base_price;
+          } else if (product.variations.length > 0) {
+            basePrice = product.variations[0].base_price;
+          }
+        }
+        
+        // Calculate derived fields
+        const totalBasePrice = basePrice * quantity;
+        const subtotal = sellingPricePerUnit * quantity;
+        const earnings = subtotal - mpFee - voucher;
+        const margin = earnings - totalBasePrice;
+        
+        // Create the processed order object in the report format
+        const processedEntry = {
+          orderDate: new Date(orderDate),
+          orderNumber,
+          productName,
+          variationName,
+          quantity,
+          basePrice,
+          totalBasePrice,
+          sellingPrice: sellingPricePerUnit,
+          subtotal,
+          mpFee,
+          voucher,
+          earnings,
+          margin
+        };
+        
+        processedEntries.push(processedEntry);
+      } catch (error) {
+        console.error(`Error processing manual entry: ${JSON.stringify(entry)}`, error);
+      }
+    });
+    
+    // Default report structure
+    let updatedReport = {
+      summary: {
+        totalOrders: processedEntries.length,
+        totalEarnings: 0,
+        averageMargin: 0
+      },
+      orders: processedEntries
+    };
     
     // If append mode and the file exists, read and merge with existing data
-    if (shouldAppend && fs.existsSync(outputPath)) {
+    if (shouldAppend && fs.existsSync(reportDataFile)) {
       try {
-        // Read existing data
-        const existingDataRaw = fs.readFileSync(outputPath);
-        const existingData = JSON.parse(existingDataRaw);
+        // Read existing report
+        const existingReportRaw = fs.readFileSync(reportDataFile);
+        const existingReport = JSON.parse(existingReportRaw);
         
         // Store the count for reporting
-        existingDataCount = existingData.length;
+        existingDataCount = existingReport.orders.length;
         
         // Create a map of existing order numbers for quick lookup
         const existingOrderMap = new Map();
-        existingData.forEach(order => {
+        existingReport.orders.forEach(order => {
           // Create a unique key using order number and product name
-          const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
+          const key = `${order.orderNumber}-${order.productName}`;
           existingOrderMap.set(key, true);
         });
         
         // Filter out duplicates from the new data
-        const uniqueNewData = manualData.filter(order => {
-          const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
+        const uniqueNewEntries = processedEntries.filter(order => {
+          const key = `${order.orderNumber}-${order.productName}`;
           const isDuplicate = existingOrderMap.has(key);
           
           if (isDuplicate) {
@@ -454,41 +527,48 @@ app.post('/manual-entry', upload.none(), (req, res) => {
         });
         
         // Combine the datasets
-        finalData = [...existingData, ...uniqueNewData];
+        updatedReport.orders = [...existingReport.orders, ...uniqueNewEntries];
         
-        console.log(`Appending manual data: ${existingDataCount} existing records, ${uniqueNewData.length} new records added, ${duplicateCount} duplicates skipped`);
+        console.log(`Appending manual data: ${existingDataCount} existing records, ${uniqueNewEntries.length} new records added, ${duplicateCount} duplicates skipped`);
       } catch (err) {
-        console.error('Error reading existing data, will replace instead:', err);
-        finalData = manualData;
+        console.error('Error reading existing report data, will replace instead:', err);
+        // Just use the new data if there's an error
       }
     } else {
-      // Replace mode - just use the new data
-      finalData = manualData;
-      console.log(`Replacing data with ${newDataCount} manual entries`);
+      console.log(`Creating new report with ${processedEntries.length} manual entries`);
     }
     
-    // Write JSON to file
-    fs.writeFileSync(outputPath, JSON.stringify(finalData, null, 2));
+    // Recalculate summary
+    let totalEarnings = 0;
+    let totalSubtotal = 0;
+    let totalMargin = 0;
     
-    // Log MP Fee Manual values for debugging
-    console.log('Manual entry MP Fee values:');
-    finalData.forEach(order => {
-      if (order["MP Fee Manual"] !== undefined) {
-        console.log(`Order ${order["No. Pesanan"]}: MP Fee Manual = ${order["MP Fee Manual"]} (${typeof order["MP Fee Manual"]})`);
-      }
+    updatedReport.orders.forEach(order => {
+      totalEarnings += order.earnings;
+      totalSubtotal += order.subtotal;
+      totalMargin += order.margin;
     });
     
-    // Automatically generate report using the newly created JSON file
-    try {
-      generateReport(outputPath);
-      console.log('Report automatically generated after manual entry');
-    } catch (reportError) {
-      console.error('Error generating report:', reportError);
+    updatedReport.summary = {
+      totalOrders: updatedReport.orders.length,
+      totalEarnings: totalEarnings,
+      averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+    };
+    
+    // Create backup of existing file
+    if (fs.existsSync(reportDataFile)) {
+      const backupFile = `${reportDataFile}.backup-${Date.now()}`;
+      fs.copyFileSync(reportDataFile, backupFile);
+      console.log(`Created backup of existing data file: ${backupFile}`);
     }
+    
+    // Write report directly to report-data.json
+    fs.writeFileSync(reportDataFile, JSON.stringify(updatedReport, null, 2));
+    console.log(`Manual entry data saved directly to report-data.json with ${updatedReport.orders.length} orders`);
     
     res.json({
       success: true,
-      message: shouldAppend ? 'Manual entries added successfully' : 'Data replaced with manual entries',
+      message: shouldAppend ? 'Manual entries added successfully' : 'Manual entries saved successfully',
       totalEntries: newDataCount,
       addedEntries: shouldAppend ? newDataCount - duplicateCount : newDataCount,
       existingEntries: existingDataCount,
