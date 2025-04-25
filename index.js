@@ -212,7 +212,68 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
     
     // Automatically generate report using the newly created JSON file
     try {
-      generateReport(outputPath);
+      // Instead of replacing report-data.json, we'll append the data from orderData.json
+      const generatedReport = generateReport(outputPath);
+      
+      // After generating the report, we need to merge with existing report data
+      const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+      
+      // If report-data.json exists, we'll merge with it
+      if (fs.existsSync(reportDataFile)) {
+        console.log('Existing report-data.json found, merging with new data');
+        
+        try {
+          // Read existing report data
+          const existingReport = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
+          
+          // Create a map of existing order numbers to prevent duplicates
+          const existingOrderMap = new Map();
+          existingReport.orders.forEach(order => {
+            const key = `${order.orderNumber}-${order.productName}`;
+            existingOrderMap.set(key, true);
+          });
+          
+          // Filter out duplicates from the generated report
+          const uniqueNewOrders = generatedReport.orders.filter(order => {
+            const key = `${order.orderNumber}-${order.productName}`;
+            return !existingOrderMap.has(key);
+          });
+          
+          console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+          
+          // Merge orders
+          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+          
+          // Recalculate summary
+          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
+          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
+          const mergedReport = {
+            summary: {
+              totalOrders: mergedOrders.length,
+              totalEarnings: totalEarnings,
+              averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+            },
+            orders: mergedOrders
+          };
+          
+          // Save the merged report
+          fs.writeFileSync(reportDataFile, JSON.stringify(mergedReport, null, 2));
+          console.log(`Successfully merged data into ${reportDataFile}`);
+        } catch (mergeError) {
+          console.error('Error merging with existing report data:', mergeError);
+          
+          // If there's an error merging, just save the generated report as is
+          fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
+          console.log(`Error merging, saved generated report to ${reportDataFile}`);
+        }
+      } else {
+        // If report-data.json doesn't exist, just save the generated report
+        fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
+        console.log(`No existing report found, saved generated report to ${reportDataFile}`);
+      }
+      
       console.log('Report automatically generated after file conversion');
     } catch (reportError) {
       console.error('Error generating report:', reportError);
@@ -297,7 +358,68 @@ app.get('/convert-file', (req, res) => {
     
     // Automatically generate report using the newly created JSON file
     try {
-      generateReport(outputPath);
+      // Instead of replacing report-data.json, we'll append the data from orderData.json
+      const generatedReport = generateReport(outputPath);
+      
+      // After generating the report, we need to merge with existing report data
+      const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+      
+      // If report-data.json exists, we'll merge with it
+      if (fs.existsSync(reportDataFile)) {
+        console.log('Existing report-data.json found, merging with new data');
+        
+        try {
+          // Read existing report data
+          const existingReport = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
+          
+          // Create a map of existing order numbers to prevent duplicates
+          const existingOrderMap = new Map();
+          existingReport.orders.forEach(order => {
+            const key = `${order.orderNumber}-${order.productName}`;
+            existingOrderMap.set(key, true);
+          });
+          
+          // Filter out duplicates from the generated report
+          const uniqueNewOrders = generatedReport.orders.filter(order => {
+            const key = `${order.orderNumber}-${order.productName}`;
+            return !existingOrderMap.has(key);
+          });
+          
+          console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+          
+          // Merge orders
+          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+          
+          // Recalculate summary
+          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
+          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
+          const mergedReport = {
+            summary: {
+              totalOrders: mergedOrders.length,
+              totalEarnings: totalEarnings,
+              averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+            },
+            orders: mergedOrders
+          };
+          
+          // Save the merged report
+          fs.writeFileSync(reportDataFile, JSON.stringify(mergedReport, null, 2));
+          console.log(`Successfully merged data into ${reportDataFile}`);
+        } catch (mergeError) {
+          console.error('Error merging with existing report data:', mergeError);
+          
+          // If there's an error merging, just save the generated report as is
+          fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
+          console.log(`Error merging, saved generated report to ${reportDataFile}`);
+        }
+      } else {
+        // If report-data.json doesn't exist, just save the generated report
+        fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
+        console.log(`No existing report found, saved generated report to ${reportDataFile}`);
+      }
+      
       console.log('Report automatically generated after file conversion');
     } catch (reportError) {
       console.error('Error generating report:', reportError);
@@ -555,13 +677,6 @@ app.post('/manual-entry', upload.none(), (req, res) => {
       averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
     };
     
-    // Create backup of existing file
-    if (fs.existsSync(reportDataFile)) {
-      const backupFile = `${reportDataFile}.backup-${Date.now()}`;
-      fs.copyFileSync(reportDataFile, backupFile);
-      console.log(`Created backup of existing data file: ${backupFile}`);
-    }
-    
     // Write report directly to report-data.json
     fs.writeFileSync(reportDataFile, JSON.stringify(updatedReport, null, 2));
     console.log(`Manual entry data saved directly to report-data.json with ${updatedReport.orders.length} orders`);
@@ -584,103 +699,55 @@ app.post('/manual-entry', upload.none(), (req, res) => {
 // API endpoint to delete specific orders by order number
 app.post('/delete-orders', (req, res) => {
   try {
-    // Get order numbers to delete from request body
-    const { orderNumbers } = req.body;
+    console.log('Delete orders request received');
+    const orderNumbers = req.body.orderNumbers;
     
     if (!orderNumbers || !Array.isArray(orderNumbers) || orderNumbers.length === 0) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'No valid order numbers provided'
-      });
+      return res.status(400).json({ success: false, error: 'Invalid order numbers provided' });
     }
     
-    // Path to the report data file
+    // Define the report data file path
     const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
     
-    // Check if report data file exists
+    // Check if the file exists
     if (!fs.existsSync(reportDataFile)) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Report data file not found'
-      });
+      return res.status(404).json({ success: false, error: 'Report data file not found' });
     }
     
-    // Save the orders to delete in a persistent file so they don't get reintroduced
-    const deletedOrdersFile = path.join(__dirname, 'deleted-orders.json');
-    let deletedOrders = [];
+    // Read existing data
+    const reportData = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
     
-    // Try to read existing deleted orders file if it exists
-    if (fs.existsSync(deletedOrdersFile)) {
-      try {
-        deletedOrders = JSON.parse(fs.readFileSync(deletedOrdersFile, 'utf8'));
-        if (!Array.isArray(deletedOrders)) {
-          deletedOrders = [];
-        }
-      } catch (err) {
-        console.error('Error reading deleted orders file:', err);
-        deletedOrders = [];
-      }
+    // Make a backup of the file
+    const backupFile = `${reportDataFile}.backup-${Date.now()}`;
+    fs.copyFileSync(reportDataFile, backupFile);
+    console.log(`Created backup at ${backupFile}`);
+    
+    // Filter out the orders to be deleted
+    const originalCount = reportData.orders.length;
+    reportData.orders = reportData.orders.filter(order => !orderNumbers.includes(order.orderNumber));
+    const deletedCount = originalCount - reportData.orders.length;
+    
+    // Update summary info
+    if (reportData.orders.length > 0) {
+      const totalEarnings = reportData.orders.reduce((sum, order) => sum + order.earnings, 0);
+      const totalSubtotal = reportData.orders.reduce((sum, order) => sum + order.subtotal, 0);
+      const totalMargin = reportData.orders.reduce((sum, order) => sum + order.margin, 0);
+      
+      reportData.summary = {
+        totalOrders: reportData.orders.length,
+        totalEarnings: totalEarnings,
+        averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+      };
     }
     
-    // Add new orders to the deleted list
-    const newDeletedOrders = orderNumbers.filter(orderNum => !deletedOrders.includes(orderNum));
-    deletedOrders = [...deletedOrders, ...newDeletedOrders];
-    
-    // Save the updated list
-    fs.writeFileSync(deletedOrdersFile, JSON.stringify(deletedOrders, null, 2));
-    console.log(`Updated deleted orders list with ${newDeletedOrders.length} new entries. Total: ${deletedOrders.length}`);
-    
-    // Read existing report
-    const existingReportRaw = fs.readFileSync(reportDataFile);
-    const existingReport = JSON.parse(existingReportRaw);
-    
-    // Store the count of orders before deletion
-    const originalCount = existingReport.orders.length;
-    
-    // Create backup of existing file (but don't create if just for the two problematic orders)
-    // These orders are causing issues, so let's handle them specially
-    const problematicOrders = ['INV/20250418/MPL/89871219236', 'INV/20250417/MPL/51453618647'];
-    const isOnlyDeletingProblematic = orderNumbers.length <= 2 && 
-      orderNumbers.every(num => problematicOrders.includes(num));
-    
-    if (!isOnlyDeletingProblematic) {
-      const backupFile = `${reportDataFile}.backup-${Date.now()}`;
-      fs.copyFileSync(reportDataFile, backupFile);
-      console.log(`Created backup of existing data file: ${backupFile}`);
-    } else {
-      console.log('Not creating backup for problematic orders deletion');
-    }
-    
-    // Filter out the orders to delete
-    existingReport.orders = existingReport.orders.filter(order => 
-      !orderNumbers.includes(order.orderNumber)
-    );
-    
-    // Recalculate summary
-    let totalEarnings = 0;
-    let totalSubtotal = 0;
-    let totalMargin = 0;
-    
-    existingReport.orders.forEach(order => {
-      totalEarnings += order.earnings;
-      totalSubtotal += order.subtotal;
-      totalMargin += order.margin;
-    });
-    
-    existingReport.summary = {
-      totalOrders: existingReport.orders.length,
-      totalEarnings: totalEarnings,
-      averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
-    };
-    
-    // Write updated report back to file
-    fs.writeFileSync(reportDataFile, JSON.stringify(existingReport, null, 2));
-    console.log(`Deleted ${originalCount - existingReport.orders.length} orders from report-data.json`);
+    // Save the updated data
+    fs.writeFileSync(reportDataFile, JSON.stringify(reportData, null, 2));
+    console.log(`Successfully deleted ${deletedCount} orders`);
     
     res.json({
       success: true,
-      message: 'Orders deleted successfully',
-      deletedCount: originalCount - existingReport.orders.length
+      deletedCount,
+      remainingCount: reportData.orders.length
     });
   } catch (error) {
     console.error('Error deleting orders:', error);
@@ -700,16 +767,133 @@ app.get('/generate-report', (req, res) => {
       });
     }
 
-    // Generate report from orderData.json (this will replace report-data.json)
-    const report = generateReport(orderDataFile);
+    // Generate report from orderData.json (this will create a new report object)
+    const generatedReport = generateReport(orderDataFile);
+    
+    // After generating the report, we need to merge with existing report data
+    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+    
+    // If report-data.json exists (and it's different from what we just generated), we'll merge with it
+    if (fs.existsSync(reportDataFile)) {
+      console.log('Existing report-data.json found, merging with new data');
+      
+      try {
+        // Read existing report data
+        const existingReport = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
+        
+        // Create a map of existing order numbers to prevent duplicates
+        const existingOrderMap = new Map();
+        existingReport.orders.forEach(order => {
+          const key = `${order.orderNumber}-${order.productName}`;
+          existingOrderMap.set(key, true);
+        });
+        
+        // Filter out duplicates from the generated report
+        const uniqueNewOrders = generatedReport.orders.filter(order => {
+          const key = `${order.orderNumber}-${order.productName}`;
+          return !existingOrderMap.has(key);
+        });
+        
+        console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+        
+        // Only merge if there are unique new orders
+        if (uniqueNewOrders.length > 0) {
+          // Merge orders
+          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+          
+          // Recalculate summary
+          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
+          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
+          const mergedReport = {
+            summary: {
+              totalOrders: mergedOrders.length,
+              totalEarnings: totalEarnings,
+              averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+            },
+            orders: mergedOrders
+          };
+          
+          // Save the merged report
+          fs.writeFileSync(reportDataFile, JSON.stringify(mergedReport, null, 2));
+          console.log(`Successfully merged data into ${reportDataFile}`);
+          
+          res.json({ 
+            success: true, 
+            message: `Report generated successfully. Added ${uniqueNewOrders.length} new orders.`,
+            summary: mergedReport.summary
+          });
+        } else {
+          // No new orders to add
+          res.json({ 
+            success: true, 
+            message: 'No new orders to add. Report remains unchanged.',
+            summary: existingReport.summary
+          });
+        }
+      } catch (mergeError) {
+        console.error('Error merging with existing report data:', mergeError);
+        
+        // If there's an error merging, use the generated report
+        fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
+        console.log(`Error merging, saved generated report to ${reportDataFile}`);
+        
+        res.json({ 
+          success: true, 
+          message: 'Report generated successfully (merge failed, created new report)',
+          summary: generatedReport.summary
+        });
+      }
+    } else {
+      // If report-data.json doesn't exist, just save the generated report
+      fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
+      console.log(`No existing report found, saved generated report to ${reportDataFile}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Report generated successfully',
+        summary: generatedReport.summary
+      });
+    }
+  } catch (error) {
+    console.error('Error generating report:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Endpoint to backup report data
+app.get('/backup-report', (req, res) => {
+  try {
+    // Path to the report data file
+    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+    
+    // Check if report-data.json exists
+    if (!fs.existsSync(reportDataFile)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Report data file not found. No data to backup.'
+      });
+    }
+
+    // Create a timestamped backup file name
+    const timestamp = new Date().toISOString().replace(/:/g, '-');
+    const backupFile = path.join(__dirname, 'public', `report-data.backup.${timestamp}.json`);
+    
+    // Copy the report data to the backup file
+    fs.copyFileSync(reportDataFile, backupFile);
+    console.log(`Created backup of report data: ${backupFile}`);
+    
+    // Get backup file name without path for response
+    const backupFileName = path.basename(backupFile);
     
     res.json({ 
       success: true, 
-      message: 'Report generated successfully from Excel data',
-      summary: report.summary
+      message: 'Report data backed up successfully',
+      backupFile: backupFileName
     });
   } catch (error) {
-    console.error('Error generating report:', error);
+    console.error('Error backing up report data:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -723,29 +907,16 @@ app.get('/refresh-report', (req, res) => {
       return res.status(404).json({ error: 'Order data file not found' });
     }
 
-    // Read order data
-    const orderData = JSON.parse(fs.readFileSync(orderDataPath, 'utf8'));
-    
     // Generate fresh report from order data
-    const reportData = generateReport(orderData.orders);
+    const generatedReport = generateReport(orderDataPath);
     
-    // Save the regenerated report
-    const reportPath = path.join(__dirname, 'public', 'report-data.json');
-    
-    // Create a backup of the current report if it exists
-    if (fs.existsSync(reportPath)) {
-      const backupPath = path.join(__dirname, 'public', `report-data-backup-${Date.now()}.json`);
-      fs.copyFileSync(reportPath, backupPath);
-      console.log(`Created backup of report data at ${backupPath}`);
-    }
-    
-    // Write the new report data
-    fs.writeFileSync(reportPath, JSON.stringify(reportData, null, 2));
+    // Get count of orders in the generated report
+    const orderCount = generatedReport.orders.length;
     
     return res.json({ 
       success: true, 
       message: 'Report refreshed successfully',
-      totalOrders: reportData.length
+      totalOrders: orderCount
     });
   } catch (error) {
     console.error('Error refreshing report:', error);
@@ -765,6 +936,9 @@ app.get('/mpfeerules.json', (req, res) => {
 // Handle blob upload
 app.post('/save-json-data', upload.single('jsonFile'), (req, res) => {
   console.log('Save JSON data request received');
+  
+  // Define the report data file path
+  const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
   
   if (!req.file) {
     console.error('No file uploaded');
@@ -823,14 +997,6 @@ app.post('/save-json-data', upload.single('jsonFile'), (req, res) => {
       }
       
       return res.status(400).json({ error: 'Invalid data format: missing or invalid orders array' });
-    }
-    
-    // Create backup of existing file
-    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
-    if (fs.existsSync(reportDataFile)) {
-      const backupFile = `${reportDataFile}.backup-${Date.now()}`;
-      fs.copyFileSync(reportDataFile, backupFile);
-      console.log(`Created backup of existing data file: ${backupFile}`);
     }
     
     // Write directly to the report data file (bypassing generateReport)

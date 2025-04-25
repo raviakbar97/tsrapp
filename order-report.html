@@ -1,0 +1,56 @@
+<div class="nav-right">
+    <button id="uploadButton" class="btn btn-primary">Upload Order Excel</button>
+    <button id="refreshButton" class="btn btn-info">Refresh</button>
+    <button id="manualEntryButton" class="btn btn-warning">Manual Entry</button>
+    <button id="backupButton" class="btn btn-secondary">Backup Data</button>
+</div>
+
+<div class="row" style="margin-bottom: 20px">
+    <div class="col">
+        <button class="btn btn-primary" onclick="handleFileUpload()">Upload Excel File</button>
+        <button class="btn btn-success" onclick="refreshReport()">Refresh Report</button>
+        <button class="btn btn-info" onclick="toggleManualEntryForm()">Manual Entry</button>
+        <button class="btn btn-secondary" onclick="backupReport()">Backup Report</button>
+    </div>
+</div>
+
+<script>
+    // Add event listener for backup button
+    document.getElementById('backupButton').addEventListener('click', function() {
+        fetch('/backup-report')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Backup created successfully: ${data.backupFile}`);
+                } else {
+                    alert(`Backup failed: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error creating backup:', error);
+                alert('Failed to create backup. Check console for details.');
+            });
+    });
+
+    // Function to backup the report data
+    function backupReport() {
+        fetchWithNotification('/backup-report', { method: 'GET' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Backup created successfully!', 'success');
+                } else {
+                    showNotification('Failed to create backup: ' + (data.error || 'Unknown error'), 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error backing up report:', error);
+                showNotification('Error backing up report: ' + error.message, 'danger');
+            });
+    }
+
+    // Function to refresh the report data
+    function refreshReport() {
+        // ... existing code ...
+    }
+</script> 

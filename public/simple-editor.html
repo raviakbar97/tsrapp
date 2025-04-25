@@ -615,15 +615,15 @@
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          showAlert('success', `Successfully removed ${data.deletedCount} persistent orders.`);
+          showStatus(`Successfully removed ${data.deletedCount} persistent orders.`, 'success');
           // Refresh the data to show the changes
           loadData();
         } else {
-          showAlert('danger', `Error: ${data.error}`);
+          showStatus(`Error: ${data.error}`, 'danger');
         }
       })
       .catch(error => {
-        showAlert('danger', `Error: ${error.message}`);
+        showStatus(`Error: ${error.message}`, 'danger');
         console.error('Error:', error);
       })
       .finally(() => {

@@ -1307,6 +1307,9 @@
         populateFilterDropdowns(window.originalData || data);
       }
       
+      // Sort orders by date (oldest to newest)
+      data.orders.sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate));
+      
       // Clear existing data
       tbody.innerHTML = '';
       bestSellersTable.innerHTML = '';
@@ -2048,6 +2051,9 @@
       let totalCogsSummary = 0;
       let totalEarningsSummary = 0;
       let cleanMarginSummary = 0;
+      
+      // Sort orders by date (oldest to newest)
+      filteredData.orders.sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate));
       
       filteredData.orders.forEach(order => {
         totalRevenueSummary += order.subtotal;

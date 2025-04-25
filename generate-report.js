@@ -248,25 +248,24 @@ function generateReport(specificJsonFile = null) {
     averageMargin: processedOrders.length > 0 ? (totalMargin / totalEarnings) * 100 : 0
   };
   
-  // Create the report object
-  const report = {
+  // Create the final report object
+  const reportObject = {
     summary,
     orders: processedOrders
   };
   
-  // Write report to file
-  fs.writeFileSync(
-    path.join(__dirname, 'public', 'report-data.json'),
-    JSON.stringify(report, null, 2)
-  );
-  
-  console.log(`Report generated with ${processedOrders.length} orders.`);
-  return report;
+  // Return the report object without writing to file
+  console.log(`Report generated with ${processedOrders.length} orders`);
+  return reportObject;
 }
 
 // Execute the report generation when file is run directly
 if (require.main === module) {
-  generateReport();
+  const report = generateReport();
+  // Write to file when run directly
+  const reportFilePath = path.join(__dirname, 'public', 'report-data.json');
+  fs.writeFileSync(reportFilePath, JSON.stringify(report, null, 2));
+  console.log(`Report written to file: ${reportFilePath}`);
 }
 
 // Export the function
