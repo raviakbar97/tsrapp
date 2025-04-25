@@ -958,7 +958,7 @@
                     <th>Product Name *</th>
                     <th>Variation</th>
                     <th>Quantity *</th>
-                    <th>Unit Price *</th>
+                    <th>Selling Price *</th>
                     <th>MP Fee *</th>
                     <th>Voucher</th>
                     <th>Action</th>
@@ -2118,7 +2118,7 @@
           <input type="number" class="form-control form-control-sm entry-quantity" min="1" required>
         </td>
         <td>
-          <input type="number" class="form-control form-control-sm entry-price" min="0" step="1000" required>
+          <input type="number" class="form-control form-control-sm entry-price" min="0" step="1000" required placeholder="Selling price (not base price)">
         </td>
         <td>
           <input type="number" class="form-control form-control-sm entry-mpfee" min="0" required>
@@ -2268,12 +2268,11 @@
         basePrice = product.variations[0].base_price;
       }
       
-      // Update the price input if it's empty or if it's the default value
-      if (!priceInput.value || priceInput.value === '0') {
-        priceInput.value = basePrice;
-      }
+      // Store the base price as a data attribute for reference, but don't auto-populate the selling price
+      row.dataset.basePrice = basePrice;
       
-      // Update MP Fee based on new base price
+      // We don't auto-populate selling price from base price since they are different
+      // Instead, we just make sure the MP Fee gets updated if the selling price is changed
       updateMpFee(row);
     }
     
