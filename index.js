@@ -581,6 +581,102 @@ app.post('/manual-entry', upload.none(), (req, res) => {
   }
 });
 
+// API endpoint to delete specific orders by order number
+app.post('/delete-orders', (req, res) => {
+  try {
+    // Get order numbers to delete from request body
+    const { orderNumbers } = req.body;
+    
+    if (!orderNumbers || !Array.isArray(orderNumbers) || orderNumbers.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'No valid order numbers provided'
+      });
+    }
+    
+    // Path to the report data file
+    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+    
+    // Check if report data file exists
+    if (!fs.existsSync(reportDataFile)) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Report data file not found'
+      });
+    }
+    
+    // Read existing report
+    const existingReportRaw = fs.readFileSync(reportDataFile);
+    const existingReport = JSON.parse(existingReportRaw);
+    
+    // Store the count of orders before deletion
+    const originalCount = existingReport.orders.length;
+    
+    // Create backup of existing file
+    const backupFile = `${reportDataFile}.backup-${Date.now()}`;
+    fs.copyFileSync(reportDataFile, backupFile);
+    console.log(`Created backup of existing data file: ${backupFile}`);
+    
+    // Filter out the orders to delete
+    existingReport.orders = existingReport.orders.filter(order => 
+      !orderNumbers.includes(order.orderNumber)
+    );
+    
+    // Recalculate summary
+    let totalEarnings = 0;
+    let totalSubtotal = 0;
+    let totalMargin = 0;
+    
+    existingReport.orders.forEach(order => {
+      totalEarnings += order.earnings;
+      totalSubtotal += order.subtotal;
+      totalMargin += order.margin;
+    });
+    
+    existingReport.summary = {
+      totalOrders: existingReport.orders.length,
+      totalEarnings: totalEarnings,
+      averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+    };
+    
+    // Write updated report back to file
+    fs.writeFileSync(reportDataFile, JSON.stringify(existingReport, null, 2));
+    console.log(`Deleted ${originalCount - existingReport.orders.length} orders from report-data.json`);
+    
+    // Also remove these orders from orderData.json if it exists
+    const orderDataFile = path.join(__dirname, 'orderData.json');
+    if (fs.existsSync(orderDataFile)) {
+      try {
+        const orderDataRaw = fs.readFileSync(orderDataFile);
+        const orderData = JSON.parse(orderDataRaw);
+        
+        // Filter out the orders to delete based on order number
+        const filteredOrderData = orderData.filter(order => 
+          !orderNumbers.includes(order["No. Pesanan"])
+        );
+        
+        // Only write back if something changed
+        if (filteredOrderData.length !== orderData.length) {
+          fs.writeFileSync(orderDataFile, JSON.stringify(filteredOrderData, null, 2));
+          console.log(`Also removed ${orderData.length - filteredOrderData.length} orders from orderData.json`);
+        }
+      } catch (err) {
+        console.error('Error updating orderData.json:', err);
+        // Continue even if orderData.json update fails
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: 'Orders deleted successfully',
+      deletedCount: originalCount - existingReport.orders.length
+    });
+  } catch (error) {
+    console.error('Error deleting orders:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // API endpoint to manually generate report from latest JSON data
 app.get('/generate-report', (req, res) => {
   try {

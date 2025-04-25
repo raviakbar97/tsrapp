@@ -2832,5 +2832,41 @@
     "Voucher Ditanggung Penjual": "0",
     "Platform": "tokopedia",
     "MP Fee Manual": "20000"
+  },
+  {
+    "No. Pesanan": "INV/20250418/MPL/89871219236",
+    "Status Pesanan": "Selesai",
+    "Waktu Pembayaran Dilakukan": "2025-04-18 02:26",
+    "Nama Produk": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
+    "Nama Variasi": "Gerobak Saja",
+    "Harga Setelah Diskon": 3700000,
+    "Jumlah": 1,
+    "Voucher Ditanggung Penjual": 0,
+    "Platform": "tokopedia",
+    "MP Fee Manual": 20000
+  },
+  {
+    "No. Pesanan": "INV/20250417/MPL/51453618647",
+    "Status Pesanan": "Selesai",
+    "Waktu Pembayaran Dilakukan": "2025-04-17 02:26",
+    "Nama Produk": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
+    "Nama Variasi": "Gerobak v3 Lengkap",
+    "Harga Setelah Diskon": 5000000,
+    "Jumlah": 1,
+    "Voucher Ditanggung Penjual": 0,
+    "Platform": "tokopedia",
+    "MP Fee Manual": 20000
+  },
+  {
+    "No. Pesanan": "ewqewq",
+    "Status Pesanan": "Selesai",
+    "Waktu Pembayaran Dilakukan": "2025-04-26 02:28",
+    "Nama Produk": "BUBUK MINUMAN RASA 500 GraM / SERBUK MINUMAN RASA / BUBUK MINUMAN ANEKA RASA / BUBUK MINUMAN KEKINIAN",
+    "Nama Variasi": "Taro",
+    "Harga Setelah Diskon": 300000,
+    "Jumlah": 1,
+    "Voucher Ditanggung Penjual": 0,
+    "Platform": "tokopedia",
+    "MP Fee Manual": 100
   }
 ]

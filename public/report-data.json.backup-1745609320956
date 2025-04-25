@@ -1,8 +1,8 @@
 {
   "summary": {
-    "totalOrders": 286,
-    "totalEarnings": 84420916,
-    "averageMargin": 38.24806283788724
+    "totalOrders": 285,
+    "totalEarnings": 84121016,
+    "averageMargin": 38.05584682904923
   },
   "orders": [
     {
@@ -4279,21 +4279,6 @@
       "voucher": 0,
       "earnings": 4980000,
       "margin": 1483000
-    },
-    {
-      "orderDate": "2025-04-25T19:28:00.000Z",
-      "orderNumber": "ewqewq",
-      "productName": "BUBUK MINUMAN RASA 500 GraM / SERBUK MINUMAN RASA / BUBUK MINUMAN ANEKA RASA / BUBUK MINUMAN KEKINIAN",
-      "variationName": "Taro",
-      "quantity": 1,
-      "basePrice": 23500,
-      "totalBasePrice": 23500,
-      "sellingPrice": 300000,
-      "subtotal": 300000,
-      "mpFee": 100,
-      "voucher": 0,
-      "earnings": 299900,
-      "margin": 276400
     }
   ]
 }

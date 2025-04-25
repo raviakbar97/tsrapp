@@ -91,6 +91,13 @@
         </tbody>
       </table>
     </div>
+
+    <div class="actions-container">
+      <button id="add-row-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Add Entry</button>
+      <button id="save-data-btn" class="btn btn-success"><i class="fas fa-save"></i> Save Changes</button>
+      <button id="refresh-data-btn" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Refresh Data</button>
+      <button id="fix-data-btn" class="btn btn-warning"><i class="fas fa-tools"></i> Fix Persistent Orders</button>
+    </div>
   </div>
 
   <!-- Confirmation Modal -->
@@ -576,7 +583,55 @@
       
       // Save edit button
       document.getElementById('save-edit-btn').addEventListener('click', saveEditedOrder);
+
+      // Set up fix data button to remove problematic orders
+      document.getElementById('fix-data-btn').addEventListener('click', function() {
+        if (confirm('This will delete two specific order entries that keep reappearing in the data. Continue?')) {
+          fixPersistentOrders();
+        }
+      });
     });
+
+    // Function to delete the problematic orders
+    function fixPersistentOrders() {
+      // Show loading state
+      document.getElementById('fix-data-btn').disabled = true;
+      document.getElementById('fix-data-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Working...';
+      
+      // Define the problematic order numbers
+      const problematicOrders = [
+        'INV/20250418/MPL/89871219236',
+        'INV/20250417/MPL/51453618647'
+      ];
+      
+      // Call the API to delete these orders
+      fetch('/delete-orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ orderNumbers: problematicOrders })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          showAlert('success', `Successfully removed ${data.deletedCount} persistent orders.`);
+          // Refresh the data to show the changes
+          loadData();
+        } else {
+          showAlert('danger', `Error: ${data.error}`);
+        }
+      })
+      .catch(error => {
+        showAlert('danger', `Error: ${error.message}`);
+        console.error('Error:', error);
+      })
+      .finally(() => {
+        // Reset button state
+        document.getElementById('fix-data-btn').disabled = false;
+        document.getElementById('fix-data-btn').innerHTML = '<i class="fas fa-tools"></i> Fix Persistent Orders';
+      });
+    }
   </script>
 </body>
 </html> 

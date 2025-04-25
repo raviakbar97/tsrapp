@@ -1,8 +1,8 @@
 {
   "summary": {
-    "totalOrders": 286,
-    "totalEarnings": 84420916,
-    "averageMargin": 38.24806283788724
+    "totalOrders": 283,
+    "totalEarnings": 75461016,
+    "averageMargin": 35.502973605973764
   },
   "orders": [
     {
@@ -4249,51 +4249,6 @@
       "voucher": 0,
       "earnings": 4980000,
       "margin": 4980000
-    },
-    {
-      "orderDate": "2025-04-17T19:26:00.000Z",
-      "orderNumber": "INV/20250418/MPL/89871219236",
-      "productName": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
-      "variationName": "Gerobak Saja",
-      "quantity": 1,
-      "basePrice": 2300000,
-      "totalBasePrice": 2300000,
-      "sellingPrice": 3700000,
-      "subtotal": 3700000,
-      "mpFee": 20000,
-      "voucher": 0,
-      "earnings": 3680000,
-      "margin": 1380000
-    },
-    {
-      "orderDate": "2025-04-16T19:26:00.000Z",
-      "orderNumber": "INV/20250417/MPL/51453618647",
-      "productName": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
-      "variationName": "Gerobak v3 Lengkap",
-      "quantity": 1,
-      "basePrice": 3497000,
-      "totalBasePrice": 3497000,
-      "sellingPrice": 5000000,
-      "subtotal": 5000000,
-      "mpFee": 20000,
-      "voucher": 0,
-      "earnings": 4980000,
-      "margin": 1483000
-    },
-    {
-      "orderDate": "2025-04-25T19:28:00.000Z",
-      "orderNumber": "ewqewq",
-      "productName": "BUBUK MINUMAN RASA 500 GraM / SERBUK MINUMAN RASA / BUBUK MINUMAN ANEKA RASA / BUBUK MINUMAN KEKINIAN",
-      "variationName": "Taro",
-      "quantity": 1,
-      "basePrice": 23500,
-      "totalBasePrice": 23500,
-      "sellingPrice": 300000,
-      "subtotal": 300000,
-      "mpFee": 100,
-      "voucher": 0,
-      "earnings": 299900,
-      "margin": 276400
     }
   ]
 }

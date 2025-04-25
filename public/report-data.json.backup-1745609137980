@@ -1,8 +1,8 @@
 {
   "summary": {
-    "totalOrders": 286,
-    "totalEarnings": 84420916,
-    "averageMargin": 38.24806283788724
+    "totalOrders": 287,
+    "totalEarnings": 92001016,
+    "averageMargin": 45.560871849502185
   },
   "orders": [
     {
@@ -4251,49 +4251,64 @@
       "margin": 4980000
     },
     {
-      "orderDate": "2025-04-17T19:26:00.000Z",
-      "orderNumber": "INV/20250418/MPL/89871219236",
-      "productName": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
-      "variationName": "Gerobak Saja",
+      "orderDate": "2025-04-25T19:03:00.000Z",
+      "orderNumber": "123",
+      "productName": "Nagoya Plastic Cup Sealer / Penyegel Gelas Plastik | NGY-37CS 22oz",
+      "variationName": "Nagoya Plastic Cup Sealer / Penyegel Gelas Plastik | NGY-37CS 22oz",
       "quantity": 1,
-      "basePrice": 2300000,
-      "totalBasePrice": 2300000,
-      "sellingPrice": 3700000,
-      "subtotal": 3700000,
+      "basePrice": 485000,
+      "totalBasePrice": 485000,
+      "sellingPrice": 1000000,
+      "subtotal": 1000000,
       "mpFee": 20000,
       "voucher": 0,
-      "earnings": 3680000,
-      "margin": 1380000
+      "earnings": 980000,
+      "margin": 495000
     },
     {
-      "orderDate": "2025-04-16T19:26:00.000Z",
-      "orderNumber": "INV/20250417/MPL/51453618647",
-      "productName": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
-      "variationName": "Gerobak v3 Lengkap",
+      "orderDate": "2025-04-25T19:06:00.000Z",
+      "orderNumber": "21313",
+      "productName": "GELAS ES TEH MANIS / GELAS ES TEA UKURAN 16 OZ DAN 22 OZ ISI 50 PCS",
+      "variationName": "16 Oz Cup",
       "quantity": 1,
-      "basePrice": 3497000,
-      "totalBasePrice": 3497000,
-      "sellingPrice": 5000000,
-      "subtotal": 5000000,
+      "basePrice": 7750,
+      "totalBasePrice": 7750,
+      "sellingPrice": 200000,
+      "subtotal": 200000,
       "mpFee": 20000,
       "voucher": 0,
-      "earnings": 4980000,
-      "margin": 1483000
+      "earnings": 180000,
+      "margin": 172250
     },
     {
-      "orderDate": "2025-04-25T19:28:00.000Z",
-      "orderNumber": "ewqewq",
-      "productName": "BUBUK MINUMAN RASA 500 GraM / SERBUK MINUMAN RASA / BUBUK MINUMAN ANEKA RASA / BUBUK MINUMAN KEKINIAN",
-      "variationName": "Taro",
+      "orderDate": "2025-04-25T19:07:00.000Z",
+      "orderNumber": "3213",
+      "productName": "PAKET USAHA ES TEH SOLO TERLENGKAP / GEROBAK ES TEH SOLO (Gratis Ongkir)",
+      "variationName": "Gerobak lengkap",
       "quantity": 1,
-      "basePrice": 23500,
-      "totalBasePrice": 23500,
-      "sellingPrice": 300000,
-      "subtotal": 300000,
-      "mpFee": 100,
+      "basePrice": 3267000,
+      "totalBasePrice": 3267000,
+      "sellingPrice": 3100000,
+      "subtotal": 3100000,
+      "mpFee": 10000,
       "voucher": 0,
-      "earnings": 299900,
-      "margin": 276400
+      "earnings": 3090000,
+      "margin": -177000
+    },
+    {
+      "orderDate": "2025-04-25T19:07:00.000Z",
+      "orderNumber": "32131",
+      "productName": "GELAS ES TEH MANIS / GELAS ES TEA UKURAN 16 OZ DAN 22 OZ ISI 50 PCS",
+      "variationName": "22 Oz Cup",
+      "quantity": 1,
+      "basePrice": 13750,
+      "totalBasePrice": 13750,
+      "sellingPrice": 12300000,
+      "subtotal": 12300000,
+      "mpFee": 10000,
+      "voucher": 0,
+      "earnings": 12290000,
+      "margin": 12276250
     }
   ]
 }
