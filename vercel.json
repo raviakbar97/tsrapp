@@ -6,12 +6,12 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "index.js"
+      "source": "/(.*)",
+      "destination": "index.js"
     }
   ],
   "cleanUrls": true,
   "trailingSlash": false
-} 
+}
