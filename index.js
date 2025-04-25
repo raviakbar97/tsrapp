@@ -643,29 +643,6 @@ app.post('/delete-orders', (req, res) => {
     fs.writeFileSync(reportDataFile, JSON.stringify(existingReport, null, 2));
     console.log(`Deleted ${originalCount - existingReport.orders.length} orders from report-data.json`);
     
-    // Also remove these orders from orderData.json if it exists
-    const orderDataFile = path.join(__dirname, 'orderData.json');
-    if (fs.existsSync(orderDataFile)) {
-      try {
-        const orderDataRaw = fs.readFileSync(orderDataFile);
-        const orderData = JSON.parse(orderDataRaw);
-        
-        // Filter out the orders to delete based on order number
-        const filteredOrderData = orderData.filter(order => 
-          !orderNumbers.includes(order["No. Pesanan"])
-        );
-        
-        // Only write back if something changed
-        if (filteredOrderData.length !== orderData.length) {
-          fs.writeFileSync(orderDataFile, JSON.stringify(filteredOrderData, null, 2));
-          console.log(`Also removed ${orderData.length - filteredOrderData.length} orders from orderData.json`);
-        }
-      } catch (err) {
-        console.error('Error updating orderData.json:', err);
-        // Continue even if orderData.json update fails
-      }
-    }
-    
     res.json({
       success: true,
       message: 'Orders deleted successfully',
@@ -680,10 +657,21 @@ app.post('/delete-orders', (req, res) => {
 // API endpoint to manually generate report from latest JSON data
 app.get('/generate-report', (req, res) => {
   try {
-    const report = generateReport();
+    // Check if orderData.json exists
+    const orderDataFile = path.join(__dirname, 'orderData.json');
+    if (!fs.existsSync(orderDataFile)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Order data file not found. Please upload an Excel file first.'
+      });
+    }
+
+    // Generate report from orderData.json (this will replace report-data.json)
+    const report = generateReport(orderDataFile);
+    
     res.json({ 
       success: true, 
-      message: 'Report generated successfully',
+      message: 'Report generated successfully from Excel data',
       summary: report.summary
     });
   } catch (error) {
