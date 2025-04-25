@@ -557,6 +557,9 @@
           <button id="refresh-report" class="btn btn-light btn-sm me-2">
             <i class="fas fa-sync-alt me-1"></i> Refresh Data
           </button>
+          <button id="regenerate-report" class="btn btn-warning btn-sm me-2">
+            <i class="fas fa-sync-alt me-1"></i> Regenerate Report
+          </button>
           <button id="data-manager-btn" class="btn btn-light btn-sm me-2">
             <i class="fas fa-database me-1"></i> Simple Editor
           </button>
@@ -1008,6 +1011,11 @@
         refreshReport();
       });
       
+      // Set up regenerate button
+      document.getElementById('regenerate-report').addEventListener('click', function() {
+        regenerateReport();
+      });
+      
       // Set up back button
       document.getElementById('back-to-home').addEventListener('click', function() {
         window.location.href = '/';
@@ -1230,27 +1238,13 @@
       refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Refreshing...';
       refreshBtn.disabled = true;
       
-      // Call the API to regenerate the report
-      fetch('/generate-report')
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            // Load the updated data
-            loadReportData();
-            showToast('Report refreshed successfully!');
-          } else {
-            showToast('Error refreshing report: ' + data.error, 'error');
-          }
-        })
-        .catch(error => {
-          console.error('Error refreshing report:', error);
-          showToast('Error refreshing report: ' + error.message, 'error');
-        })
-        .finally(() => {
-          // Reset button state
-          refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh Data';
-          refreshBtn.disabled = false;
-        });
+      // Instead of regenerating the report, just reload the existing report-data.json
+      loadReportData();
+      showToast('Report data refreshed!');
+      
+      // Reset button state
+      refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh Data';
+      refreshBtn.disabled = false;
     }
     
     function showToast(message, type = 'success') {
@@ -2526,6 +2520,41 @@
       resultEl.textContent = message;
       resultEl.className = `alert alert-${type}`;
       resultEl.classList.remove('d-none');
+    }
+
+    // Add a regenerate function that will recreate the report from the original orderData.json
+    function regenerateReport() {
+      // Show confirmation first
+      if (!confirm("This will regenerate the report from the original order data, potentially undoing any edits made in the Simple Editor. Continue?")) {
+        return;
+      }
+      
+      // Show loading state
+      const refreshBtn = document.getElementById('refresh-report');
+      refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Regenerating...';
+      refreshBtn.disabled = true;
+      
+      // Call the API to regenerate the report
+      fetch('/generate-report')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Load the updated data
+            loadReportData();
+            showToast('Report regenerated successfully from original data!');
+          } else {
+            showToast('Error regenerating report: ' + data.error, 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Error regenerating report:', error);
+          showToast('Error regenerating report: ' + error.message, 'error');
+        })
+        .finally(() => {
+          // Reset button state
+          refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Refresh Data';
+          refreshBtn.disabled = false;
+        });
     }
   </script>
 </body>
