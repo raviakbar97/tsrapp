@@ -1153,7 +1153,16 @@
         method: 'POST',
         body: formData
       })
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(errorData => {
+            throw new Error(`Server error: ${errorData.error || response.statusText}`);
+          }).catch(e => {
+            throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+          });
+        }
+        return response.json();
+      })
       .then(data => {
         // Hide loading status
         uploadStatus.classList.add('d-none');

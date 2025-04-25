@@ -10,18 +10,23 @@ const generateReport = require('./generate-report');
 const app = express();
 const port = 3000;
 
-// Set up storage for uploaded files
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  }
-});
+// Check if we're running on Vercel
+const isVercel = process.env.VERCEL === '1';
 
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync('uploads')) {
+// Set up storage for uploaded files
+const storage = isVercel 
+  ? multer.memoryStorage() // Use memory storage on Vercel
+  : multer.diskStorage({    // Use disk storage locally
+      destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+      },
+      filename: (req, file, cb) => {
+        cb(null, file.originalname);
+      }
+    });
+
+// Create uploads directory if it doesn't exist and we're not on Vercel
+if (!isVercel && !fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
@@ -118,8 +123,17 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const filePath = req.file.path;
-    const workbook = XLSX.readFile(filePath);
+    let workbook;
+    
+    // Handle file based on storage type
+    if (isVercel) {
+      // For memory storage (Vercel)
+      workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    } else {
+      // For disk storage (local development)
+      const filePath = req.file.path;
+      workbook = XLSX.readFile(filePath);
+    }
     
     // Get the first sheet name
     const sheetName = workbook.SheetNames[0];
@@ -204,12 +218,14 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
       console.error('Error generating report:', reportError);
     }
     
-    // Delete the original uploaded Excel file
-    try {
-      fs.unlinkSync(filePath);
-      console.log(`Deleted uploaded Excel file: ${filePath}`);
-    } catch (deleteError) {
-      console.error('Error deleting uploaded Excel file:', deleteError);
+    // Delete the original uploaded Excel file if using disk storage
+    if (!isVercel && req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`Deleted uploaded Excel file: ${req.file.path}`);
+      } catch (deleteError) {
+        console.error('Error deleting uploaded Excel file:', deleteError);
+      }
     }
     
     res.json({ 
@@ -228,8 +244,8 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
   } catch (error) {
     console.error('Error converting file:', error);
     
-    // Clean up the uploaded file in case of error
-    if (req.file && req.file.path) {
+    // Clean up the uploaded file in case of error (only for disk storage)
+    if (!isVercel && req.file && req.file.path) {
       try {
         fs.unlinkSync(req.file.path);
         console.log(`Deleted uploaded Excel file after error: ${req.file.path}`);
@@ -510,20 +526,30 @@ app.post('/save-json-data', upload.single('jsonFile'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
   
-  console.log(`Uploaded file: ${req.file.path}, Size: ${req.file.size} bytes`);
-  
-  const filePath = req.file.path;
-  
-  // Check if the file exists
-  if (!fs.existsSync(filePath)) {
-    console.error(`File does not exist at path: ${filePath}`);
-    return res.status(500).json({ error: 'File upload failed' });
-  }
-  
   try {
-    // Read the uploaded file
-    const fileData = fs.readFileSync(filePath, 'utf8');
-    console.log(`Read file data, length: ${fileData.length}`);
+    let fileData;
+    
+    // Handle file based on storage type
+    if (isVercel) {
+      // For memory storage (Vercel)
+      fileData = req.file.buffer.toString('utf8');
+      console.log(`Read file data from buffer, length: ${fileData.length}`);
+    } else {
+      // For disk storage (local development)
+      const filePath = req.file.path;
+      console.log(`Uploaded file: ${filePath}, Size: ${req.file.size} bytes`);
+      
+      // Check if the file exists
+      if (!fs.existsSync(filePath)) {
+        console.error(`File does not exist at path: ${filePath}`);
+        return res.status(500).json({ error: 'File upload failed' });
+      }
+      
+      // Read the uploaded file
+      fileData = fs.readFileSync(filePath, 'utf8');
+      console.log(`Read file data, length: ${fileData.length}`);
+    }
+    
     console.log(`File data preview: ${fileData.substring(0, 100)}...`);
     
     // Parse JSON
@@ -533,16 +559,24 @@ app.post('/save-json-data', upload.single('jsonFile'), (req, res) => {
       console.log('JSON parsed successfully');
     } catch (parseError) {
       console.error('Failed to parse JSON:', parseError);
-      // Clean up the temp file
-      try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting invalid file:', e); }
+      
+      // Clean up the temp file if using disk storage
+      if (!isVercel && req.file && req.file.path) {
+        try { fs.unlinkSync(req.file.path); } catch (e) { console.error('Error deleting invalid file:', e); }
+      }
+      
       return res.status(400).json({ error: 'Invalid JSON data' });
     }
     
     // Validate that it has a proper structure with orders array and summary
     if (!jsonData.orders || !Array.isArray(jsonData.orders)) {
       console.error('Invalid data format: missing or invalid orders array');
-      // Clean up the temp file
-      try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting invalid file:', e); }
+      
+      // Clean up the temp file if using disk storage
+      if (!isVercel && req.file && req.file.path) {
+        try { fs.unlinkSync(req.file.path); } catch (e) { console.error('Error deleting invalid file:', e); }
+      }
+      
       return res.status(400).json({ error: 'Invalid data format: missing or invalid orders array' });
     }
     
@@ -558,21 +592,70 @@ app.post('/save-json-data', upload.single('jsonFile'), (req, res) => {
     fs.writeFileSync(reportDataFile, JSON.stringify(jsonData, null, 2));
     console.log(`Successfully saved data to ${reportDataFile}`);
     
-    // Clean up the uploaded temp file
-    try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting temp file:', e); }
+    // Clean up the uploaded temp file if using disk storage
+    if (!isVercel && req.file && req.file.path) {
+      try { fs.unlinkSync(req.file.path); } catch (e) { console.error('Error deleting temp file:', e); }
+    }
     
     res.json({ success: true, message: 'Data saved successfully' });
   } catch (error) {
     console.error('Error processing uploaded file:', error);
-    // Clean up the temp file if it exists
-    try { 
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+    
+    // Clean up the temp file if using disk storage
+    if (!isVercel && req.file && req.file.path) {
+      try { 
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (e) { 
+        console.error('Error deleting temp file:', e); 
       }
-    } catch (e) { 
-      console.error('Error deleting temp file:', e); 
     }
+    
     res.status(500).json({ error: 'Server error processing the upload', details: error.message });
+  }
+});
+
+// Diagnostic endpoint to check uploads directory
+app.get('/uploads-check', (req, res) => {
+  try {
+    const uploadDir = path.join(__dirname, 'uploads');
+    const uploadExists = fs.existsSync(uploadDir);
+    
+    // Try to create it if it doesn't exist
+    if (!uploadExists) {
+      try {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        console.log('Created uploads directory');
+      } catch (createError) {
+        console.error('Error creating uploads directory:', createError);
+      }
+    }
+    
+    // Check again after attempted creation
+    const dirExists = fs.existsSync(uploadDir);
+    
+    // Try to write a test file
+    let canWrite = false;
+    if (dirExists) {
+      try {
+        const testFile = path.join(uploadDir, 'test.txt');
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        canWrite = true;
+      } catch (writeError) {
+        console.error('Error writing to uploads directory:', writeError);
+      }
+    }
+    
+    res.json({
+      uploadDirExists: dirExists,
+      canWrite: canWrite,
+      dirname: __dirname,
+      uploadPath: uploadDir
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
