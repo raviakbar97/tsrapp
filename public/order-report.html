@@ -557,9 +557,6 @@
           <button id="refresh-report" class="btn btn-light btn-sm me-2">
             <i class="fas fa-sync-alt me-1"></i> Refresh Data
           </button>
-          <button id="regenerate-report" class="btn btn-warning btn-sm me-2">
-            <i class="fas fa-sync-alt me-1"></i> Regenerate Report
-          </button>
           <button id="data-manager-btn" class="btn btn-light btn-sm me-2">
             <i class="fas fa-database me-1"></i> Simple Editor
           </button>
@@ -1009,11 +1006,6 @@
       // Set up refresh button
       document.getElementById('refresh-report').addEventListener('click', function() {
         refreshReport();
-      });
-      
-      // Set up regenerate button
-      document.getElementById('regenerate-report').addEventListener('click', function() {
-        regenerateReport();
       });
       
       // Set up back button
@@ -2515,47 +2507,12 @@
     }
     
     // Show manual entry result
-    function showManualEntryResult(message, type) {
+    function showManualEntryResult(message, type = 'success') {
       const resultEl = document.getElementById('manual-entry-result');
       resultEl.textContent = message;
       resultEl.className = `alert alert-${type}`;
       resultEl.classList.remove('d-none');
     }
-
-    // Add a regenerate function that will recreate the report from the original orderData.json
-    function regenerateReport() {
-      // Show confirmation first
-      if (!confirm("This will regenerate the report from the original order data (orderData.json), potentially undoing any edits made in the Simple Editor or manual entries. Continue?")) {
-        return;
-      }
-      
-      // Show loading state
-      const regenerateBtn = document.getElementById('regenerate-report');
-      regenerateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Regenerating...';
-      regenerateBtn.disabled = true;
-      
-      // Call the API to regenerate the report
-      fetch('/generate-report')
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            // Load the updated data
-            loadReportData();
-            showToast('Report regenerated successfully from original data!');
-          } else {
-            showToast('Error regenerating report: ' + data.error, 'error');
-          }
-        })
-        .catch(error => {
-          console.error('Error regenerating report:', error);
-          showToast('Error regenerating report: ' + error.message, 'error');
-        })
-        .finally(() => {
-          // Reset button state
-          regenerateBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i> Regenerate Report';
-          regenerateBtn.disabled = false;
-        });
-    }
   </script>
 </body>
-</html> 
+</html>
