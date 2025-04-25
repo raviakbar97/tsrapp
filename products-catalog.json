@@ -1,0 +1,401 @@
+{
+  "catalog_version": "1.0",
+  "last_updated": "2025-04-25T08:47:11.641Z",
+  "products_count": 23,
+  "products": [
+    {
+      "product_name": "BUBUK MINUMAN RASA 500 GraM / SERBUK MINUMAN RASA / BUBUK MINUMAN ANEKA RASA / BUBUK MINUMAN KEKINIAN",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Taro",
+          "base_price": 23500
+        },
+        {
+          "name": "Strawberry",
+          "base_price": 23500
+        },
+        {
+          "name": "Red Velvet",
+          "base_price": 23500
+        },
+        {
+          "name": "Vanilla Latte",
+          "base_price": 23500
+        },
+        {
+          "name": "Blueberry",
+          "base_price": 23500
+        },
+        {
+          "name": "Chocolate Hazelnut",
+          "base_price": 23500
+        },
+        {
+          "name": "Cookies and Cream",
+          "base_price": 23500
+        },
+        {
+          "name": "Thai Tea",
+          "base_price": 23500
+        },
+        {
+          "name": "Matcha",
+          "base_price": 23500
+        },
+        {
+          "name": "Chocolate",
+          "base_price": 23500
+        }
+      ]
+    },
+    {
+      "product_name": "FRANCHISE MINUMAN ES SUSU KEKINIAN",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Paket Silver",
+          "base_price": 2594667
+        },
+        {
+          "name": "Paket Gold",
+          "base_price": 3394667
+        },
+        {
+          "name": "Paket Bronze",
+          "base_price": 1944667
+        }
+      ]
+    },
+    {
+      "product_name": "GELAS ES TEH MANIS / GELAS ES TEA UKURAN 16 OZ DAN 22 OZ ISI 50 PCS",
+      "category": "B",
+      "variations": [
+        {
+          "name": "16 Oz Cup",
+          "base_price": 7750
+        },
+        {
+          "name": "22 Oz Cup",
+          "base_price": 13750
+        }
+      ]
+    },
+    {
+      "product_name": "Nagoya Plastic Cup Sealer / Penyegel Gelas Plastik | NGY-37CS 22oz",
+      "category": "B",
+      "variations": [
+        {
+          "name": "Nagoya Plastic Cup Sealer / Penyegel Gelas Plastik | NGY-37CS 22oz",
+          "base_price": 485000
+        }
+      ]
+    },
+    {
+      "product_name": "Ongkos Kirim Paket Usaha",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Ongkos Kirim Paket Usaha",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "Packing Kayu",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Packing Kayu",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "PAKET TESTER - FRANCHISE MINUMAN SUSU KEKININAN",
+      "category": "A",
+      "variations": [
+        {
+          "name": "PAKET TESTER - FRANCHISE MINUMAN SUSU KEKININAN",
+          "base_price": 60000
+        }
+      ]
+    },
+    {
+      "product_name": "Paket Usaha Es Teh Solo Booth Portable (KHUSUS JABODETABEK)",
+      "category": "B",
+      "variations": [
+        {
+          "name": "Paket Usaha Es Teh Solo Booth Portable (KHUSUS JABODETABEK)",
+          "base_price": 1667000
+        }
+      ]
+    },
+    {
+      "product_name": "Paket Usaha Es Teh Solo Murah Lengkap Free XBanner(booth)",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Paket Usaha Es Teh Solo Murah Lengkap Free XBanner(booth)",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "PAKET USAHA ES TEH SOLO SIAP JUALAN / GEROBAK ES TEH SOLO (GRATIS ONGKIR)",
+      "category": "B",
+      "variations": [
+        {
+          "name": "Booth lite Lengkap",
+          "base_price": 1667000
+        },
+        {
+          "name": "Booth Saja",
+          "base_price": 1400000
+        },
+        {
+          "name": "Gerobak Lengkap",
+          "base_price": 3267000
+        },
+        {
+          "name": "Gerobak v2 Lengkap",
+          "base_price": 3167000
+        },
+        {
+          "name": "Booth v2 Saja",
+          "base_price": 1700000
+        },
+        {
+          "name": "Tanpa Cup Sealer",
+          "base_price": 467000
+        },
+        {
+          "name": "Gerobak Roda kecil",
+          "base_price": 2200000
+        },
+        {
+          "name": "Gerobak v3 Lengkap",
+          "base_price": 3497000
+        },
+        {
+          "name": "Booth Lengkap",
+          "base_price": 2367000
+        },
+        {
+          "name": "Perlengkapan Saja",
+          "base_price": 967000
+        },
+        {
+          "name": "Gerobak v3 saja",
+          "base_price": 2530000
+        },
+        {
+          "name": "Gerobak Saja",
+          "base_price": 2300000
+        },
+        {
+          "name": "Booth V2 Lengkap",
+          "base_price": 2667000
+        }
+      ]
+    },
+    {
+      "product_name": "PAKET USAHA ES TEH SOLO TERLENGKAP / GEROBAK ES TEH SOLO (Gratis Ongkir)",
+      "category": "B",
+      "variations": [
+        {
+          "name": "Booth Lengkap",
+          "base_price": 2367000
+        },
+        {
+          "name": "Gerobak lengkap",
+          "base_price": 3267000
+        },
+        {
+          "name": "Booth saja",
+          "base_price": 1400000
+        },
+        {
+          "name": "Perlengkapan Saja",
+          "base_price": 967000
+        },
+        {
+          "name": "Tanpa Cup Sealer",
+          "base_price": 467000
+        },
+        {
+          "name": "Gerobak v3 Saja",
+          "base_price": 2530000
+        },
+        {
+          "name": "Gerobak v3 Lengkap",
+          "base_price": 3497000
+        },
+        {
+          "name": "Gerobak Saja",
+          "base_price": 2300000
+        },
+        {
+          "name": "Booth v2 lengkap",
+          "base_price": 2667000
+        },
+        {
+          "name": "Booth v2 Saja",
+          "base_price": 1700000
+        },
+        {
+          "name": "Gerobak Roda kecil",
+          "base_price": 2200000
+        },
+        {
+          "name": "Gerobak v2 Lengkap",
+          "base_price": 3167000
+        },
+        {
+          "name": "Booth lite Lengkap",
+          "base_price": 1667000
+        }
+      ]
+    },
+    {
+      "product_name": "Paket Usaha teh solo",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Gerobak Saja",
+          "base_price": 0
+        },
+        {
+          "name": "Booth saja",
+          "base_price": 0
+        },
+        {
+          "name": "Paket Booth Hemat",
+          "base_price": 0
+        },
+        {
+          "name": "Perlengkapan Saja",
+          "base_price": 0
+        },
+        {
+          "name": "Paket Gerobak",
+          "base_price": 0
+        },
+        {
+          "name": "Paket Booth",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "Racikan Teh Solo Aroma Istimewa",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Racikan Teh Solo Aroma Istimewa",
+          "base_price": 11500
+        }
+      ]
+    },
+    {
+      "product_name": "Racikan Teh Solo Untuk Jualan Es Teh Solo Melati Paket 5 Pcs",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Racikan Teh Solo Untuk Jualan Es Teh Solo Melati Paket 5 Pcs",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "Racikan Teh Solo Untuk Jualan Es Teh Solo Paket 5 pcs",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Racikan Teh Solo Untuk Jualan Es Teh Solo Paket 5 pcs",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "Seal Cup Plastik Lid Cup Sealer 1000 Cup",
+      "category": "B",
+      "variations": [
+        {
+          "name": "Seal Cup Plastik Lid Cup Sealer 1000 Cup",
+          "base_price": 22917
+        }
+      ]
+    },
+    {
+      "product_name": "Sedotan Steril Hitam - Sedotan Lancip Isi 250 Pcs",
+      "category": "B",
+      "variations": [
+        {
+          "name": "Sedotan Steril Hitam - Sedotan Lancip Isi 250 Pcs",
+          "base_price": 6100
+        }
+      ]
+    },
+    {
+      "product_name": "TEH RACIK KHAS SOLO ARJUNA Untuk 10-12 Liter",
+      "category": "A",
+      "variations": [
+        {
+          "name": "TEH RACIK KHAS SOLO ARJUNA Untuk 10-12 Liter",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "TEH RACIK SOLO BENGAWAN SIAP JUALAN",
+      "category": "A",
+      "variations": [
+        {
+          "name": "TEH RACIK SOLO BENGAWAN SIAP JUALAN",
+          "base_price": 8500
+        }
+      ]
+    },
+    {
+      "product_name": "TEH RACIK SOLO BENGAWAN TEH ASLI",
+      "category": "A",
+      "variations": [
+        {
+          "name": "TEH RACIK SOLO BENGAWAN TEH ASLI",
+          "base_price": 8500
+        }
+      ]
+    },
+    {
+      "product_name": "TEH RACIK SOLO BENGAWAN UNTUK JUALAN",
+      "category": "A",
+      "variations": [
+        {
+          "name": "TEH RACIK SOLO BENGAWAN UNTUK JUALAN",
+          "base_price": 8500
+        }
+      ]
+    },
+    {
+      "product_name": "Teh Racik Solo Untuk Jualan Es Teh Solo Melati Paket 10 Pcs",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Teh Racik Solo Untuk Jualan Es Teh Solo Melati Paket 10 Pcs",
+          "base_price": 0
+        }
+      ]
+    },
+    {
+      "product_name": "Teh Racikan Solo Bengawan Extra Wangi",
+      "category": "A",
+      "variations": [
+        {
+          "name": "Teh Racikan Solo Bengawan Extra Wangi",
+          "base_price": 0
+        }
+      ]
+    }
+  ]
+}

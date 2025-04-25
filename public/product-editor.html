@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Catalog Editor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1, h2, h3 {
+      color: #444;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .product-list {
+      margin-top: 20px;
+    }
+    .product-item {
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    .product-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .product-header h3 {
+      margin: 0;
+      flex: 1;
+    }
+    .product-details {
+      margin-top: 15px;
+      display: none;
+    }
+    .product-details.active {
+      display: block;
+    }
+    .variation-list {
+      margin-top: 10px;
+    }
+    .variation-item {
+      background-color: #fff;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+    .save-all-btn {
+      background-color: #2196F3;
+      margin-top: 20px;
+    }
+    .save-all-btn:hover {
+      background-color: #0b7dda;
+    }
+    .fee-rules {
+      background-color: #e9f7ef;
+      border: 1px solid #c3e6cb;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .fee-category {
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .fee-item {
+      margin-left: 20px;
+      margin-bottom: 5px;
+    }
+    .search-box {
+      margin-bottom: 20px;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+    }
+    .status-message {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .hidden {
+      display: none;
+    }
+    .category-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 10px;
+      background-color: #e0e0e0;
+    }
+    .category-A {
+      background-color: #b3e0ff;
+      color: #0066cc;
+    }
+    .category-B {
+      background-color: #ffd699;
+      color: #cc7a00;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Product Catalog Editor</h1>
+      <div class="button-group">
+        <button id="expandAllBtn">Expand All</button>
+        <button id="collapseAllBtn">Collapse All</button>
+      </div>
+    </div>
+
+    <div class="fee-rules">
+      <h2>Fee Rules</h2>
+      <div id="feeRulesContent"></div>
+    </div>
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search products...">
+    </div>
+
+    <div id="statusMessage" class="status-message hidden"></div>
+
+    <div class="product-list" id="productList">
+      <p>Loading products...</p>
+    </div>
+
+    <button id="saveAllBtn" class="save-all-btn">Save All Changes</button>
+  </div>
+
+  <script>
+    // Global variables to store the data
+    let productCatalog = null;
+    let feeRules = null;
+    const apiEndpoint = '/api'; // Backend API endpoint
+
+    // Fetch product catalog and fee rules when page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        // Load fee rules
+        feeRules = await fetchFeeRules();
+        displayFeeRules(feeRules);
+        
+        // Load product catalog
+        productCatalog = await fetchProductCatalog();
+        displayProducts(productCatalog.products);
+        
+        // Set up event listeners
+        setupEventListeners();
+      } catch (error) {
+        showStatusMessage('Error loading data: ' + error.message, 'error');
+      }
+    });
+
+    // Fetch fee rules from server
+    async function fetchFeeRules() {
+      try {
+        const response = await fetch('/mpfeerules.json');
+        if (!response.ok) {
+          throw new Error('Failed to load fee rules');
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching fee rules:', error);
+        throw error;
+      }
+    }
+
+    // Fetch product catalog from server
+    async function fetchProductCatalog() {
+      try {
+        const response = await fetch('/products-catalog.json');
+        if (!response.ok) {
+          throw new Error('Failed to load product catalog');
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching product catalog:', error);
+        throw error;
+      }
+    }
+
+    // Display fee rules in the UI
+    function displayFeeRules(feeRules) {
+      const feeRulesElement = document.getElementById('feeRulesContent');
+      let html = '';
+      
+      feeRules.rules.forEach(rule => {
+        html += `<div class="fee-category">
+          <h3>Category ${rule.category}</h3>`;
+        
+        rule.fee_rules.forEach(feeRule => {
+          html += `<div class="fee-item">
+            <p><strong>${feeRule.description}:</strong> ${feeRule.value}% of ${feeRule.field}`;
+          
+          if (feeRule.max_fee) {
+            html += ` (maximum: ${feeRule.max_fee.toLocaleString()})`;
+          }
+          
+          html += `</p>
+          </div>`;
+        });
+        
+        html += `</div>`;
+      });
+      
+      feeRulesElement.innerHTML = html;
+    }
+
+    // Display products in the UI
+    function displayProducts(products) {
+      const productListElement = document.getElementById('productList');
+      
+      if (products.length === 0) {
+        productListElement.innerHTML = '<p>No products found.</p>';
+        return;
+      }
+      
+      let html = '';
+      
+      products.forEach((product, index) => {
+        html += `
+          <div class="product-item" data-index="${index}">
+            <div class="product-header">
+              <h3>${product.product_name} <span class="category-badge category-${product.category}">Category ${product.category}</span></h3>
+              <button class="toggle-btn">Details</button>
+            </div>
+            <div class="product-details">
+              <div class="form-group">
+                <label for="product-category-${index}">Fee Category:</label>
+                <select id="product-category-${index}">
+                  <option value="A" ${product.category === 'A' ? 'selected' : ''}>Category A</option>
+                  <option value="B" ${product.category === 'B' ? 'selected' : ''}>Category B</option>
+                </select>
+              </div>
+              <h4>Variations (${product.variations.length}):</h4>
+              <div class="variation-list">`;
+        
+        // Add variations
+        product.variations.forEach((variation, vIndex) => {
+          html += `
+                <div class="variation-item">
+                  <div class="form-group">
+                    <label>Variation Name:</label>
+                    <div>${variation.name}</div>
+                  </div>
+                  <div class="form-group">
+                    <label for="variation-price-${index}-${vIndex}">Base Price:</label>
+                    <input type="number" id="variation-price-${index}-${vIndex}" value="${variation.base_price || 0}" min="0" step="1000">
+                  </div>
+                </div>`;
+        });
+        
+        html += `
+              </div>
+              <button class="save-product-btn" data-index="${index}">Save Product</button>
+            </div>
+          </div>`;
+      });
+      
+      productListElement.innerHTML = html;
+      
+      // Add click event for toggle buttons
+      document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const productItem = this.closest('.product-item');
+          const details = productItem.querySelector('.product-details');
+          details.classList.toggle('active');
+          this.textContent = details.classList.contains('active') ? 'Hide' : 'Details';
+        });
+      });
+      
+      // Add click event for save product buttons
+      document.querySelectorAll('.save-product-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.getAttribute('data-index'));
+          saveProduct(index, this);
+        });
+      });
+    }
+
+    // Save a single product
+    function saveProduct(index, buttonElement) {
+      // Disable button and show loading spinner
+      if (buttonElement) {
+        const originalText = buttonElement.textContent;
+        buttonElement.disabled = true;
+        buttonElement.innerHTML = `Saving <span class="spinner"></span>`;
+      }
+      
+      const product = productCatalog.products[index];
+      const category = document.getElementById(`product-category-${index}`).value;
+      
+      // Update the product object
+      product.category = category;
+      
+      // Update variations
+      product.variations.forEach((variation, vIndex) => {
+        const basePrice = parseInt(document.getElementById(`variation-price-${index}-${vIndex}`).value) || 0;
+        variation.base_price = basePrice;
+      });
+      
+      // Save to server
+      saveProductCatalog()
+        .then(() => {
+          // Re-enable button and restore text
+          if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.textContent = 'Save Product';
+          }
+          
+          showStatusMessage(`Product "${product.product_name}" saved successfully!`, 'success');
+          
+          // Update the category badge
+          const productItem = document.querySelector(`.product-item[data-index="${index}"]`);
+          const badge = productItem.querySelector('.category-badge');
+          badge.className = `category-badge category-${category}`;
+          badge.textContent = `Category ${category}`;
+        })
+        .catch(error => {
+          // Re-enable button and restore text on error
+          if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.textContent = 'Save Product';
+          }
+          
+          showStatusMessage('Error saving product: ' + error.message, 'error');
+        });
+    }
+
+    // Save all products
+    function saveAllProducts() {
+      // Disable button and show loading spinner
+      const saveAllBtn = document.getElementById('saveAllBtn');
+      const originalText = saveAllBtn.textContent;
+      saveAllBtn.disabled = true;
+      saveAllBtn.innerHTML = `Saving All <span class="spinner"></span>`;
+      
+      // Update product catalog last_updated timestamp
+      productCatalog.last_updated = new Date().toISOString();
+      
+      // Save to server
+      saveProductCatalog()
+        .then(() => {
+          // Re-enable button and restore text
+          saveAllBtn.disabled = false;
+          saveAllBtn.textContent = originalText;
+          
+          showStatusMessage('All products saved successfully!', 'success');
+          
+          // Refresh the display to update category badges
+          displayProducts(productCatalog.products);
+        })
+        .catch(error => {
+          // Re-enable button and restore text on error
+          saveAllBtn.disabled = false;
+          saveAllBtn.textContent = originalText;
+          
+          showStatusMessage('Error saving products: ' + error.message, 'error');
+        });
+    }
+
+    // Save product catalog to server
+    async function saveProductCatalog() {
+      try {
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(productCatalog)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to save product catalog');
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Error saving product catalog:', error);
+        throw error;
+      }
+    }
+
+    // Set up event listeners
+    function setupEventListeners() {
+      // Search functionality
+      document.getElementById('searchInput').addEventListener('input', function() {
+        const searchText = this.value.toLowerCase();
+        filterProducts(searchText);
+      });
+      
+      // Expand all button
+      document.getElementById('expandAllBtn').addEventListener('click', function() {
+        document.querySelectorAll('.product-details').forEach(details => {
+          details.classList.add('active');
+        });
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+          btn.textContent = 'Hide';
+        });
+      });
+      
+      // Collapse all button
+      document.getElementById('collapseAllBtn').addEventListener('click', function() {
+        document.querySelectorAll('.product-details').forEach(details => {
+          details.classList.remove('active');
+        });
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+          btn.textContent = 'Details';
+        });
+      });
+      
+      // Save all button
+      document.getElementById('saveAllBtn').addEventListener('click', saveAllProducts);
+    }
+
+    // Filter products based on search text
+    function filterProducts(searchText) {
+      document.querySelectorAll('.product-item').forEach(item => {
+        const productName = item.querySelector('h3').textContent.toLowerCase();
+        if (productName.includes(searchText)) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    // Show status message
+    function showStatusMessage(message, type) {
+      const statusElement = document.getElementById('statusMessage');
+      statusElement.textContent = message;
+      statusElement.className = `status-message ${type}`;
+      
+      // Show the message
+      statusElement.classList.remove('hidden');
+      
+      // Hide after 5 seconds
+      setTimeout(() => {
+        statusElement.classList.add('hidden');
+      }, 5000);
+    }
+  </script>
+</body>
+</html> 

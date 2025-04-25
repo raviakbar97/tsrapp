@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Report Data Editor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css">
+  <style>
+    body {
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+    
+    .editor-header {
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .table-responsive {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .action-buttons {
+      margin-bottom: 15px;
+    }
+    
+    .positive {
+      color: green;
+    }
+    
+    .negative {
+      color: red;
+    }
+
+    .deleted-row {
+      text-decoration: line-through;
+      background-color: #ffcccc !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="editor-header">
+      <div class="row">
+        <div class="col-md-8">
+          <h1>Simple Report Data Editor</h1>
+          <p>Directly edit and delete entries in report-data.json</p>
+        </div>
+        <div class="col-md-4 text-end">
+          <button id="save-changes" class="btn btn-success">
+            <i class="fas fa-save me-1"></i> Save Changes
+          </button>
+          <button id="back-button" class="btn btn-outline-secondary ms-2">
+            <i class="fas fa-arrow-left me-1"></i> Back
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button id="delete-selected" class="btn btn-danger" disabled>
+        <i class="fas fa-trash me-1"></i> Delete Selected
+      </button>
+      <span id="data-count" class="ms-3">Loading data...</span>
+    </div>
+
+    <div class="alert alert-info" id="status-message" style="display: none;"></div>
+    
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered">
+        <thead>
+          <tr>
+            <th width="40px"><input type="checkbox" id="select-all"></th>
+            <th>Order Date</th>
+            <th>Order Number</th>
+            <th>Product</th>
+            <th>Variation</th>
+            <th>Qty</th>
+            <th>Earnings</th>
+            <th>Margin</th>
+            <th width="80px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="data-table">
+          <tr>
+            <td colspan="9" class="text-center">Loading data...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div class="modal fade" id="confirmation-modal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Action</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="confirmation-message">
+          Are you sure?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="confirm-action">Yes, Proceed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal fade" id="edit-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Order</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="edit-form">
+            <input type="hidden" id="edit-index">
+            
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="edit-order-date" class="form-label">Order Date</label>
+                <input type="datetime-local" class="form-control" id="edit-order-date" required>
+              </div>
+              <div class="col-md-6">
+                <label for="edit-order-number" class="form-label">Order Number</label>
+                <input type="text" class="form-control" id="edit-order-number" required>
+              </div>
+            </div>
+            
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="edit-product-name" class="form-label">Product Name</label>
+                <input type="text" class="form-control" id="edit-product-name" required>
+              </div>
+              <div class="col-md-6">
+                <label for="edit-variation-name" class="form-label">Variation Name</label>
+                <input type="text" class="form-control" id="edit-variation-name" required>
+              </div>
+            </div>
+            
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <label for="edit-quantity" class="form-label">Quantity</label>
+                <input type="number" class="form-control" id="edit-quantity" min="1" required>
+              </div>
+              <div class="col-md-4">
+                <label for="edit-base-price" class="form-label">Base Price</label>
+                <input type="number" class="form-control" id="edit-base-price" min="0" required>
+              </div>
+              <div class="col-md-4">
+                <label for="edit-selling-price" class="form-label">Selling Price</label>
+                <input type="number" class="form-control" id="edit-selling-price" min="0" required>
+              </div>
+            </div>
+            
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="edit-mp-fee" class="form-label">Marketplace Fee</label>
+                <input type="number" class="form-control" id="edit-mp-fee" min="0" required>
+              </div>
+              <div class="col-md-6">
+                <label for="edit-voucher" class="form-label">Voucher</label>
+                <input type="number" class="form-control" id="edit-voucher" min="0" required>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col-12">
+                <div class="alert alert-info">
+                  <small>The following values will be calculated automatically:</small>
+                  <ul class="mb-0">
+                    <li><small>Total Base Price = Base Price × Quantity</small></li>
+                    <li><small>Subtotal = Selling Price × Quantity</small></li>
+                    <li><small>Earnings = Subtotal - MP Fee - Voucher</small></li>
+                    <li><small>Margin = Earnings - Total Base Price</small></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="save-edit-btn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let reportData = null;
+    let originalData = null;
+    const deletedRows = new Set();
+    const modifiedRows = new Set();
+    
+    // Format currency
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value);
+    }
+    
+    // Format date
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+    }
+    
+    // Load data
+    async function loadData() {
+      try {
+        const response = await fetch('/report-data.json');
+        if (!response.ok) {
+          throw new Error(`Failed to load data: ${response.status} ${response.statusText}`);
+        }
+        
+        reportData = await response.json();
+        // Keep a copy of the original data for comparison
+        originalData = JSON.parse(JSON.stringify(reportData));
+        
+        // Display data
+        displayData();
+        
+        // Show data count
+        document.getElementById('data-count').textContent = `Total: ${reportData.orders.length} orders`;
+      } catch (error) {
+        console.error('Error loading data:', error);
+        showStatus(`Error loading data: ${error.message}`, 'danger');
+      }
+    }
+    
+    // Display data in table
+    function displayData() {
+      const tableBody = document.getElementById('data-table');
+      tableBody.innerHTML = '';
+      
+      if (!reportData || !reportData.orders || reportData.orders.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="9" class="text-center">No data available</td></tr>';
+        return;
+      }
+      
+      reportData.orders.forEach((order, index) => {
+        const row = document.createElement('tr');
+        if (deletedRows.has(index)) {
+          row.classList.add('deleted-row');
+        }
+        
+        row.innerHTML = `
+          <td><input type="checkbox" class="row-checkbox" data-index="${index}" ${deletedRows.has(index) ? 'checked' : ''}></td>
+          <td>${formatDate(order.orderDate)}</td>
+          <td>${order.orderNumber}</td>
+          <td>${order.productName}</td>
+          <td>${order.variationName}</td>
+          <td class="text-center">${order.quantity}</td>
+          <td class="text-end">${formatCurrency(order.earnings)}</td>
+          <td class="text-end ${order.margin >= 0 ? 'positive' : 'negative'}">${formatCurrency(order.margin)}</td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-info edit-btn me-1" data-index="${index}">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-danger delete-btn" data-index="${index}">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        `;
+        
+        tableBody.appendChild(row);
+      });
+      
+      // Add event listeners for delete buttons
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.getAttribute('data-index'));
+          deleteRow(index);
+        });
+      });
+      
+      // Add event listeners for edit buttons
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.getAttribute('data-index'));
+          openEditModal(index);
+        });
+      });
+      
+      // Add event listeners for checkboxes
+      document.querySelectorAll('.row-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          updateDeleteSelectedButton();
+        });
+      });
+    }
+    
+    // Delete a row
+    function deleteRow(index) {
+      if (deletedRows.has(index)) {
+        deletedRows.delete(index);
+      } else {
+        deletedRows.add(index);
+      }
+      
+      displayData();
+      updateDeleteSelectedButton();
+    }
+    
+    // Delete selected rows
+    function deleteSelectedRows() {
+      const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
+      
+      selectedCheckboxes.forEach(checkbox => {
+        const index = parseInt(checkbox.getAttribute('data-index'));
+        deletedRows.add(index);
+      });
+      
+      displayData();
+      updateDeleteSelectedButton();
+      
+      // Uncheck select all
+      document.getElementById('select-all').checked = false;
+    }
+    
+    // Update delete selected button state
+    function updateDeleteSelectedButton() {
+      const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
+      document.getElementById('delete-selected').disabled = selectedCheckboxes.length === 0;
+    }
+    
+    // Open edit modal
+    function openEditModal(index) {
+      const order = reportData.orders[index];
+      
+      // Fill form with order data
+      document.getElementById('edit-index').value = index;
+      
+      // Convert order date to local date-time format for the input
+      const orderDate = new Date(order.orderDate);
+      const localDateString = orderDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+      document.getElementById('edit-order-date').value = localDateString;
+      
+      document.getElementById('edit-order-number').value = order.orderNumber;
+      document.getElementById('edit-product-name').value = order.productName;
+      document.getElementById('edit-variation-name').value = order.variationName;
+      document.getElementById('edit-quantity').value = order.quantity;
+      document.getElementById('edit-base-price').value = order.basePrice;
+      document.getElementById('edit-selling-price').value = order.sellingPrice;
+      document.getElementById('edit-mp-fee').value = order.mpFee;
+      document.getElementById('edit-voucher').value = order.voucher;
+      
+      // Show modal
+      const modal = new bootstrap.Modal(document.getElementById('edit-modal'));
+      modal.show();
+    }
+    
+    // Save edited order
+    function saveEditedOrder() {
+      // Get form values
+      const index = parseInt(document.getElementById('edit-index').value);
+      const orderDateStr = document.getElementById('edit-order-date').value;
+      const orderNumber = document.getElementById('edit-order-number').value;
+      const productName = document.getElementById('edit-product-name').value;
+      const variationName = document.getElementById('edit-variation-name').value;
+      const quantity = parseInt(document.getElementById('edit-quantity').value);
+      const basePrice = parseFloat(document.getElementById('edit-base-price').value);
+      const sellingPrice = parseFloat(document.getElementById('edit-selling-price').value);
+      const mpFee = parseFloat(document.getElementById('edit-mp-fee').value);
+      const voucher = parseFloat(document.getElementById('edit-voucher').value);
+      
+      // Basic validation
+      if (!orderDateStr || !orderNumber || !productName || !variationName || 
+          isNaN(quantity) || isNaN(basePrice) || isNaN(sellingPrice) || 
+          isNaN(mpFee) || isNaN(voucher)) {
+        showStatus('Please fill in all required fields with valid values', 'danger');
+        return;
+      }
+      
+      // Calculate derived values
+      const totalBasePrice = basePrice * quantity;
+      const subtotal = sellingPrice * quantity;
+      const earnings = subtotal - mpFee - voucher;
+      const margin = earnings - totalBasePrice;
+      
+      // Create updated order object
+      const updatedOrder = {
+        orderDate: new Date(orderDateStr).toISOString(),
+        orderNumber,
+        productName,
+        variationName,
+        quantity,
+        basePrice,
+        totalBasePrice,
+        sellingPrice,
+        subtotal,
+        mpFee,
+        voucher,
+        earnings,
+        margin
+      };
+      
+      // Update data
+      reportData.orders[index] = updatedOrder;
+      
+      // Mark as modified
+      modifiedRows.add(index);
+      
+      // Hide modal
+      const modal = bootstrap.Modal.getInstance(document.getElementById('edit-modal'));
+      modal.hide();
+      
+      // Refresh display
+      displayData();
+      
+      // Show success message
+      showStatus('Order updated successfully. Remember to save changes!', 'success');
+    }
+    
+    // Save changes
+    async function saveChanges() {
+      try {
+        if (deletedRows.size === 0 && modifiedRows.size === 0) {
+          showStatus('No changes to save', 'info');
+          return;
+        }
+        
+        // Create new array without deleted rows
+        const updatedOrders = reportData.orders.filter((_, index) => !deletedRows.has(index));
+        
+        // Update summary
+        const totalEarnings = updatedOrders.reduce((sum, order) => sum + order.earnings, 0);
+        const totalSubtotal = updatedOrders.reduce((sum, order) => sum + order.subtotal, 0);
+        const totalMargin = updatedOrders.reduce((sum, order) => sum + order.margin, 0);
+        
+        const updatedData = {
+          summary: {
+            totalOrders: updatedOrders.length,
+            totalEarnings: totalEarnings,
+            averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+          },
+          orders: updatedOrders
+        };
+        
+        // Create JSON blob
+        const jsonBlob = new Blob([JSON.stringify(updatedData, null, 2)], { type: 'text/plain' });
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('jsonFile', jsonBlob, 'data.txt');
+        
+        // Send to server
+        const response = await fetch('/save-json-data', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to save data');
+        }
+        
+        // Success message details
+        let successMsg = '';
+        if (deletedRows.size > 0) {
+          successMsg += `Deleted ${deletedRows.size} orders. `;
+        }
+        if (modifiedRows.size > 0) {
+          successMsg += `Updated ${modifiedRows.size} orders. `;
+        }
+        
+        // Success
+        showStatus(`Successfully saved changes. ${successMsg}`, 'success');
+        
+        // Reset tracking sets
+        deletedRows.clear();
+        modifiedRows.clear();
+        
+        // Reload data to reflect changes
+        await loadData();
+      } catch (error) {
+        console.error('Error saving changes:', error);
+        showStatus(`Error saving changes: ${error.message}`, 'danger');
+      }
+    }
+    
+    // Show status message
+    function showStatus(message, type = 'info') {
+      const statusEl = document.getElementById('status-message');
+      statusEl.textContent = message;
+      statusEl.className = `alert alert-${type}`;
+      statusEl.style.display = 'block';
+      
+      // Auto hide after 5 seconds
+      setTimeout(() => {
+        statusEl.style.display = 'none';
+      }, 5000);
+    }
+    
+    // Show confirmation dialog
+    function showConfirmation(message, confirmCallback) {
+      const modal = new bootstrap.Modal(document.getElementById('confirmation-modal'));
+      document.getElementById('confirmation-message').textContent = message;
+      
+      // Set confirm action
+      const confirmBtn = document.getElementById('confirm-action');
+      const oldClickHandler = confirmBtn.onclick;
+      
+      confirmBtn.onclick = function() {
+        modal.hide();
+        confirmCallback();
+        
+        // Reset the click handler
+        confirmBtn.onclick = oldClickHandler;
+      };
+      
+      modal.show();
+    }
+    
+    // Document ready
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load data
+      loadData();
+      
+      // Select all checkbox
+      document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(checkbox => {
+          checkbox.checked = this.checked;
+          
+          // Update deleted rows
+          const index = parseInt(checkbox.getAttribute('data-index'));
+          if (this.checked) {
+            deletedRows.add(index);
+          } else {
+            deletedRows.delete(index);
+          }
+        });
+        
+        updateDeleteSelectedButton();
+        displayData();
+      });
+      
+      // Delete selected button
+      document.getElementById('delete-selected').addEventListener('click', function() {
+        const selectedCount = document.querySelectorAll('.row-checkbox:checked').length;
+        showConfirmation(`Are you sure you want to delete ${selectedCount} selected orders?`, deleteSelectedRows);
+      });
+      
+      // Save changes button
+      document.getElementById('save-changes').addEventListener('click', function() {
+        if (deletedRows.size === 0 && modifiedRows.size === 0) {
+          showStatus('No changes to save', 'info');
+          return;
+        }
+        
+        showConfirmation(`Are you sure you want to save changes? This will delete ${deletedRows.size} orders and update ${modifiedRows.size} orders.`, saveChanges);
+      });
+      
+      // Back button
+      document.getElementById('back-button').addEventListener('click', function() {
+        window.location.href = '/';
+      });
+      
+      // Save edit button
+      document.getElementById('save-edit-btn').addEventListener('click', saveEditedOrder);
+    });
+  </script>
+</body>
+</html> 

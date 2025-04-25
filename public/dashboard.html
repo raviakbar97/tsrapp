@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teh Solo Racikan - Business Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #3a7bd5;
+      --secondary: #00d2ff;
+      --dark: #2c3e50;
+      --light: #f8f9fa;
+      --success: #2ecc71;
+      --danger: #e74c3c;
+      --warning: #f39c12;
+      --info: #3498db;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fb;
+      color: #333;
+      min-height: 100vh;
+    }
+    
+    .main-header {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 1.5rem 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .welcome-message {
+      opacity: 0;
+      animation: fadeIn 1s ease-out forwards;
+      animation-delay: 0.5s;
+    }
+    
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+    
+    .brand-logo {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+    }
+    
+    .brand-logo i {
+      margin-right: 10px;
+      font-size: 1.5rem;
+    }
+    
+    .card {
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-header {
+      background: white;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      padding: 1.25rem 1.5rem;
+      font-weight: 600;
+    }
+    
+    .card-title {
+      display: flex;
+      align-items: center;
+      font-weight: 600;
+      margin-bottom: 0;
+    }
+    
+    .card-title i {
+      margin-right: 10px;
+      opacity: 0.7;
+    }
+    
+    .stat-card {
+      text-align: center;
+      padding: 1.5rem;
+    }
+    
+    .stat-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      background: rgba(58, 123, 213, 0.1);
+      width: 64px;
+      height: 64px;
+      line-height: 64px;
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+    }
+    
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+      color: #8a8a8a;
+      font-size: 0.9rem;
+    }
+    
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+    
+    .user-menu {
+      display: flex;
+      align-items: center;
+    }
+    
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      font-weight: 600;
+    }
+    
+    .btn-logout {
+      color: white;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.2s;
+    }
+    
+    .btn-logout:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+    
+    .menu-card {
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      text-decoration: none;
+      color: var(--dark);
+      transition: all 0.3s;
+    }
+    
+    .menu-card:hover {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+    }
+    
+    .menu-card:hover .menu-icon {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+    }
+    
+    .menu-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      background: rgba(58, 123, 213, 0.1);
+      width: 70px;
+      height: 70px;
+      line-height: 70px;
+      border-radius: 50%;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    
+    .menu-card:hover .menu-icon {
+      color: white;
+    }
+    
+    .menu-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .menu-description {
+      font-size: 0.9rem;
+      text-align: center;
+      color: #8a8a8a;
+      transition: all 0.3s;
+    }
+    
+    .menu-card:hover .menu-description {
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .business-summary {
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+    
+    .highlight {
+      font-weight: 600;
+      color: var(--primary);
+    }
+    
+    .success-text {
+      color: var(--success);
+    }
+    
+    .warning-text {
+      color: var(--warning);
+    }
+    
+    .info-text {
+      color: var(--info);
+    }
+    
+    .quick-stats {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    
+    .quick-stat {
+      background: white;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-right: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      min-width: 150px;
+    }
+    
+    .quick-stat-label {
+      font-size: 0.85rem;
+      color: #8a8a8a;
+      margin-bottom: 0.5rem;
+    }
+    
+    .quick-stat-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    
+    .trend-up {
+      color: var(--success);
+    }
+    
+    .trend-down {
+      color: var(--danger);
+    }
+    
+    /* Animations */
+    .fade-in {
+      opacity: 0;
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+    
+    .fade-in:nth-child(1) { animation-delay: 0.1s; }
+    .fade-in:nth-child(2) { animation-delay: 0.2s; }
+    .fade-in:nth-child(3) { animation-delay: 0.3s; }
+    .fade-in:nth-child(4) { animation-delay: 0.4s; }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="main-header mb-4">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <div class="brand-logo">
+            <i class="fas fa-mug-hot"></i>
+            <span>Teh Solo Racikan</span>
+          </div>
+          <div class="welcome-message mt-2">
+            <small>Welcome back, <span id="username">CEO</span>! Here's your business at a glance.</small>
+          </div>
+        </div>
+        <div class="col-md-6 text-end">
+          <div class="user-menu">
+            <div class="user-avatar">
+              <i class="fas fa-user"></i>
+            </div>
+            <button id="logout-btn" class="btn btn-sm btn-logout">
+              <i class="fas fa-sign-out-alt me-1"></i> Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  
+  <main class="container">
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <div class="card fade-in">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title">
+              <i class="fas fa-chart-line text-primary"></i>
+              Business Overview
+            </h5>
+            <div id="date-range-display" class="badge bg-primary">Loading...</div>
+          </div>
+          <div class="card-body">
+            <div id="loading-indicator" class="text-center py-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-3">Loading business data...</p>
+            </div>
+            
+            <div id="business-data" class="d-none">
+              <div class="business-summary mb-4">
+                <p>
+                  Your business is showing a <span id="revenue-growth" class="highlight success-text">--</span> in revenue compared to previous period. Sales of <span id="top-product" class="highlight">--</span> have increased by <span id="top-product-growth" class="highlight success-text">--</span>, making it your top-performing product.
+                </p>
+                <p>
+                  Your marketplace fees are <span id="mpfee-status" class="highlight">--</span> of revenue. Your average product margin is <span id="avg-margin" class="highlight success-text">--</span>, showing that your pricing strategy is effective.
+                </p>
+              </div>
+              
+              <div class="quick-stats">
+                <div class="quick-stat">
+                  <div class="quick-stat-label">Total Revenue</div>
+                  <div id="total-revenue" class="quick-stat-value">--</div>
+                  <small id="revenue-trend" class="trend-up"><i class="fas fa-arrow-up"></i> --</small>
+                </div>
+                
+                <div class="quick-stat">
+                  <div class="quick-stat-label">Total Orders</div>
+                  <div id="total-orders" class="quick-stat-value">--</div>
+                  <small id="orders-trend" class="trend-up"><i class="fas fa-arrow-up"></i> --</small>
+                </div>
+                
+                <div class="quick-stat">
+                  <div class="quick-stat-label">Avg. Order Value</div>
+                  <div id="avg-order-value" class="quick-stat-value">--</div>
+                  <small id="aov-trend" class="trend-up"><i class="fas fa-arrow-up"></i> --</small>
+                </div>
+                
+                <div class="quick-stat">
+                  <div class="quick-stat-label">Clean Margin</div>
+                  <div id="clean-margin" class="quick-stat-value">--</div>
+                  <small id="margin-trend" class="trend-up"><i class="fas fa-arrow-up"></i> --</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card fade-in">
+          <div class="card-header">
+            <h5 class="card-title">
+              <i class="fas fa-chart-bar text-primary"></i>
+              Sales Performance
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="chart-container">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4">
+        <div class="row">
+          <div class="col-12">
+            <div class="card fade-in">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title">
+                  <i class="fas fa-fire text-primary"></i>
+                  Best Selling Products
+                </h5>
+                <div class="spinner-border spinner-border-sm text-primary d-none" id="products-loading" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </div>
+              <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="best-sellers-list">
+                  <li class="list-group-item text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Loading products data...</p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-12">
+            <div class="card fade-in">
+              <div class="card-header">
+                <h5 class="card-title">
+                  <i class="fas fa-bullseye text-primary"></i>
+                  Performance Metrics
+                </h5>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between mb-1">
+                    <small>Revenue Goal</small>
+                    <small id="revenue-progress">-- / --</small>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div id="revenue-progress-bar" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                </div>
+                
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between mb-1">
+                    <small>Order Quantity</small>
+                    <small id="orders-progress">-- / --</small>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div id="orders-progress-bar" class="progress-bar bg-info" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                </div>
+                
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between mb-1">
+                    <small>Margin Target</small>
+                    <small id="margin-progress">-- / --</small>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div id="margin-progress-bar" class="progress-bar bg-warning" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                </div>
+                
+                <div>
+                  <div class="d-flex justify-content-between mb-1">
+                    <small>MP Fee Optimization</small>
+                    <small id="mpfee-progress">-- / --</small>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div id="mpfee-progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row mb-4">
+      <div class="col-12">
+        <h5 class="mb-3">Quick Access</h5>
+      </div>
+      
+      <div class="col-md-3 fade-in">
+        <a href="/order-report.html" class="card menu-card">
+          <div class="menu-icon">
+            <i class="fas fa-chart-line"></i>
+          </div>
+          <h6 class="menu-title">Order Report</h6>
+          <p class="menu-description">Detailed analysis of all orders with filtering options</p>
+        </a>
+      </div>
+      
+      <div class="col-md-3 fade-in">
+        <a href="#" class="card menu-card">
+          <div class="menu-icon">
+            <i class="fas fa-box"></i>
+          </div>
+          <h6 class="menu-title">Inventory Management</h6>
+          <p class="menu-description">Track stock levels and manage products</p>
+        </a>
+      </div>
+      
+      <div class="col-md-3 fade-in">
+        <a href="#" class="card menu-card">
+          <div class="menu-icon">
+            <i class="fas fa-user-friends"></i>
+          </div>
+          <h6 class="menu-title">Customer Database</h6>
+          <p class="menu-description">View and manage customer information</p>
+        </a>
+      </div>
+      
+      <div class="col-md-3 fade-in">
+        <a href="#" class="card menu-card">
+          <div class="menu-icon">
+            <i class="fas fa-cog"></i>
+          </div>
+          <h6 class="menu-title">Settings</h6>
+          <p class="menu-description">Configure your dashboard and preferences</p>
+        </a>
+      </div>
+    </div>
+  </main>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check login status
+      if (localStorage.getItem('tsrLoggedIn') !== 'true') {
+        window.location.href = '/index.html';
+        return;
+      }
+      
+      // Set username
+      const username = localStorage.getItem('tsrUsername') || 'User';
+      document.getElementById('username').textContent = username;
+      
+      // Set up logout button
+      document.getElementById('logout-btn').addEventListener('click', function() {
+        localStorage.removeItem('tsrLoggedIn');
+        localStorage.removeItem('tsrUsername');
+        window.location.href = '/index.html';
+      });
+      
+      // Load real data
+      loadOrderData();
+    });
+    
+    // Format currency for Indonesian Rupiah
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value);
+    }
+    
+    // Format percentage
+    function formatPercentage(value) {
+      return new Intl.NumberFormat('id-ID', {
+        style: 'percent',
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+      }).format(value / 100);
+    }
+    
+    // Load order data
+    async function loadOrderData() {
+      try {
+        const response = await fetch('/report-data.json');
+        if (!response.ok) {
+          throw new Error('Failed to fetch order data');
+        }
+        
+        const orderData = await response.json();
+        processOrderData(orderData);
+      } catch (error) {
+        console.error('Error loading order data:', error);
+        document.getElementById('loading-indicator').innerHTML = `
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Error loading data: ${error.message}. Please try again later.
+          </div>
+        `;
+      }
+    }
+    
+    // Process order data
+    function processOrderData(data) {
+      if (!data || !data.orders || !data.orders.length) {
+        document.getElementById('loading-indicator').innerHTML = `
+          <div class="alert alert-info">
+            <h4><i class="fas fa-info-circle me-2"></i>No Data Available</h4>
+            <p>There are no orders available. Please upload some data to see business insights.</p>
+            <a href="/order-report.html" class="btn btn-primary mt-2">
+              <i class="fas fa-chart-line me-2"></i>Go to Order Report
+            </a>
+            <p class="mt-3 small text-muted">This is sample dashboard will show real business metrics once data is available.</p>
+          </div>
+        `;
+        
+        // Create sample data for demonstration
+        const sampleOrders = [
+          {
+            productName: "Teh Solo Special",
+            quantity: 142
+          },
+          {
+            productName: "Teh Solo Melati",
+            quantity: 118
+          },
+          {
+            productName: "Teh Solo Panas",
+            quantity: 97
+          },
+          {
+            productName: "Teh Solo Es",
+            quantity: 89
+          },
+          {
+            productName: "Teh Solo Jahe",
+            quantity: 37
+          }
+        ];
+        
+        // Show some sample best sellers for demonstration
+        const bestSellersHtml = sampleOrders.map((product, index) => {
+          return `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <span class="badge bg-primary rounded-pill me-2">${index + 1}</span>
+                ${product.productName}
+              </div>
+              <span class="badge bg-light text-dark">${product.quantity} units</span>
+            </li>
+          `;
+        }).join('');
+        
+        document.getElementById('best-sellers-list').innerHTML = bestSellersHtml;
+        document.getElementById('date-range-display').textContent = 'Sample Data';
+        
+        // Show sample data in the chart
+        initSampleChart();
+        
+        return;
+      }
+      
+      // Use the orders array from the data
+      const orders = data.orders;
+      
+      // Hide loading and show data
+      document.getElementById('loading-indicator').classList.add('d-none');
+      document.getElementById('business-data').classList.remove('d-none');
+      
+      // Calculate overall metrics
+      const totalOrders = orders.length;
+      let totalRevenue = 0;
+      let totalEarnings = 0;
+      let totalMpFee = 0;
+      let totalCogs = 0;
+      let totalMargin = 0;
+      
+      // Product analysis
+      const productSales = {};
+      const productRevenue = {};
+      
+      // Date analysis
+      const earliestDate = new Date(Math.min(...orders.map(order => new Date(order.orderDate))));
+      const latestDate = new Date(Math.max(...orders.map(order => new Date(order.orderDate))));
+      
+      // Date range display
+      document.getElementById('date-range-display').textContent = 
+        `${earliestDate.toLocaleDateString('en-GB')} - ${latestDate.toLocaleDateString('en-GB')}`;
+      
+      // Process each order
+      orders.forEach(order => {
+        // Calculate totals
+        const subtotal = parseFloat(order.subtotal) || 0;
+        const mpFee = parseFloat(order.mpFee) || 0;
+        const voucher = parseFloat(order.voucher) || 0;
+        const earnings = parseFloat(order.earnings) || 0;
+        const basePrice = parseFloat(order.basePrice) || 0;
+        const quantity = parseInt(order.quantity) || 1;
+        const cogs = basePrice * quantity;
+        
+        totalRevenue += subtotal;
+        totalMpFee += mpFee;
+        totalEarnings += earnings;
+        totalCogs += cogs;
+        
+        // Track product sales
+        const productName = order.productName;
+        if (!productSales[productName]) {
+          productSales[productName] = 0;
+          productRevenue[productName] = 0;
+        }
+        productSales[productName] += quantity;
+        productRevenue[productName] += subtotal;
+      });
+      
+      // Calculate margin
+      totalMargin = totalEarnings - totalCogs;
+      const marginPercentage = (totalMargin / totalEarnings) * 100;
+      
+      // Sort products by sales volume
+      const sortedProducts = Object.keys(productSales).sort((a, b) => {
+        return productSales[b] - productSales[a];
+      });
+      
+      // Top 5 products
+      const topProducts = sortedProducts.slice(0, 5);
+      
+      // Calculate average order value
+      const avgOrderValue = totalRevenue / totalOrders;
+      
+      // Fill in data
+      document.getElementById('total-revenue').textContent = formatCurrency(totalRevenue);
+      document.getElementById('total-orders').textContent = totalOrders;
+      document.getElementById('avg-order-value').textContent = formatCurrency(avgOrderValue);
+      document.getElementById('clean-margin').textContent = formatCurrency(totalMargin);
+      
+      // Assuming growth compared to previous period (placeholder for now)
+      document.getElementById('revenue-growth').textContent = '10% growth';
+      document.getElementById('revenue-trend').innerHTML = '<i class="fas fa-arrow-up"></i> 10%';
+      document.getElementById('orders-trend').innerHTML = '<i class="fas fa-arrow-up"></i> 8%';
+      document.getElementById('aov-trend').innerHTML = '<i class="fas fa-arrow-up"></i> 5%';
+      document.getElementById('margin-trend').innerHTML = '<i class="fas fa-arrow-up"></i> 12%';
+      
+      // Top product
+      if (topProducts.length > 0) {
+        const topProduct = topProducts[0];
+        document.getElementById('top-product').textContent = topProduct;
+        document.getElementById('top-product-growth').textContent = '18% growth';
+      }
+      
+      // MP Fee status
+      const mpFeePercentage = (totalMpFee / totalRevenue) * 100;
+      document.getElementById('mpfee-status').textContent = `${mpFeePercentage.toFixed(1)}%`;
+      
+      // Average margin
+      document.getElementById('avg-margin').textContent = `${marginPercentage.toFixed(1)}%`;
+      
+      // Populate best sellers list
+      const bestSellersHtml = topProducts.map((product, index) => {
+        return `
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <span class="badge bg-primary rounded-pill me-2">${index + 1}</span>
+              ${product}
+            </div>
+            <span class="badge bg-light text-dark">${productSales[product]} units</span>
+          </li>
+        `;
+      }).join('');
+      
+      document.getElementById('best-sellers-list').innerHTML = bestSellersHtml;
+      
+      // Progress metrics (using targets)
+      const revenueTarget = 20000000; // 20M IDR
+      const revenuePercentage = Math.min(100, Math.round((totalRevenue / revenueTarget) * 100));
+      document.getElementById('revenue-progress').textContent = `${formatCurrency(totalRevenue)} / ${formatCurrency(revenueTarget)}`;
+      document.getElementById('revenue-progress-bar').style.width = `${revenuePercentage}%`;
+      document.getElementById('revenue-progress-bar').setAttribute('aria-valuenow', revenuePercentage);
+      
+      const ordersTarget = 500;
+      const ordersPercentage = Math.min(100, Math.round((totalOrders / ordersTarget) * 100));
+      document.getElementById('orders-progress').textContent = `${totalOrders} / ${ordersTarget}`;
+      document.getElementById('orders-progress-bar').style.width = `${ordersPercentage}%`;
+      document.getElementById('orders-progress-bar').setAttribute('aria-valuenow', ordersPercentage);
+      
+      const marginTarget = 35; // 35%
+      const currentMarginPct = marginPercentage;
+      const marginTargetPercentage = Math.min(100, Math.round((currentMarginPct / marginTarget) * 100));
+      document.getElementById('margin-progress').textContent = `${currentMarginPct.toFixed(1)}% / ${marginTarget}%`;
+      document.getElementById('margin-progress-bar').style.width = `${marginTargetPercentage}%`;
+      document.getElementById('margin-progress-bar').setAttribute('aria-valuenow', marginTargetPercentage);
+      
+      const mpFeeTarget = 8; // 8%
+      // Lower MP Fee is better, so we invert the percentage
+      const mpFeeOptimization = Math.min(100, Math.round((1 - (mpFeePercentage / mpFeeTarget)) * 100) + 50);
+      document.getElementById('mpfee-progress').textContent = `${mpFeePercentage.toFixed(1)}% / ${mpFeeTarget}%`;
+      document.getElementById('mpfee-progress-bar').style.width = `${mpFeeOptimization}%`;
+      document.getElementById('mpfee-progress-bar').setAttribute('aria-valuenow', mpFeeOptimization);
+      
+      // Initialize sales performance chart
+      initSalesChart(data);
+    }
+    
+    function initSalesChart(orderData) {
+      const ctx = document.getElementById('salesChart').getContext('2d');
+      
+      // Use the orders array
+      const orders = orderData.orders || [];
+      
+      // Group orders by date
+      const ordersByDate = {};
+      
+      // Get all unique dates and initialize them
+      orders.forEach(order => {
+        const orderDate = new Date(order.orderDate);
+        const dateStr = orderDate.toISOString().split('T')[0];
+        
+        if (!ordersByDate[dateStr]) {
+          ordersByDate[dateStr] = {
+            revenue: 0,
+            earnings: 0
+          };
+        }
+        
+        ordersByDate[dateStr].revenue += parseFloat(order.subtotal) || 0;
+        ordersByDate[dateStr].earnings += parseFloat(order.earnings) || 0;
+      });
+      
+      // Sort dates
+      const sortedDates = Object.keys(ordersByDate).sort();
+      
+      // Prepare chart data
+      const chartLabels = sortedDates.map(date => {
+        const d = new Date(date);
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+      });
+      
+      const revenueData = sortedDates.map(date => ordersByDate[date].revenue / 1000000);
+      const earningsData = sortedDates.map(date => ordersByDate[date].earnings / 1000000);
+      
+      const salesData = {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: 'Revenue',
+            data: revenueData,
+            backgroundColor: 'rgba(58, 123, 213, 0.1)',
+            borderColor: 'rgba(58, 123, 213, 1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Earnings',
+            data: earningsData,
+            backgroundColor: 'rgba(46, 204, 113, 0.1)',
+            borderColor: 'rgba(46, 204, 113, 1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      };
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: salesData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': Rp ';
+                  }
+                  if (context.parsed.y !== null) {
+                    label += context.parsed.y.toFixed(1) + 'M';
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return 'Rp ' + value + 'M';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // Function to show a sample chart when no data is available
+    function initSampleChart() {
+      const ctx = document.getElementById('salesChart').getContext('2d');
+      
+      const sampleData = {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [
+          {
+            label: 'Revenue (Sample)',
+            data: [12.5, 14.3, 13.8, 15.2, 16.1, 15.7],
+            backgroundColor: 'rgba(58, 123, 213, 0.1)',
+            borderColor: 'rgba(58, 123, 213, 1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Earnings (Sample)',
+            data: [4.2, 5.1, 4.9, 5.8, 6.3, 6.1],
+            backgroundColor: 'rgba(46, 204, 113, 0.1)',
+            borderColor: 'rgba(46, 204, 113, 1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      };
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: sampleData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': Rp ';
+                  }
+                  if (context.parsed.y !== null) {
+                    label += context.parsed.y.toFixed(1) + 'M';
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return 'Rp ' + value + 'M';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html> 

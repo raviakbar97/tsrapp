@@ -1,0 +1,60 @@
+{
+  "rules": [
+    {
+      "category": "A",
+      "fee_rules": [
+        {
+          "type": "percentage",
+          "description": "Marketplace Commission Fee",
+          "value": 7.5,
+          "field": "harga setelah diskon"
+        },
+        {
+          "type": "percentage",
+          "description": "Payment Processing Fee",
+          "value": 4.0,
+          "field": "harga setelah diskon",
+          "max_fee": 10000
+        }
+      ]
+    },
+    {
+      "category": "B",
+      "fee_rules": [
+        {
+          "type": "percentage",
+          "description": "Marketplace Commission Fee",
+          "value": 8.0,
+          "field": "harga setelah diskon"
+        },
+        {
+          "type": "percentage",
+          "description": "Payment Processing Fee",
+          "value": 4.0,
+          "field": "harga setelah diskon",
+          "max_fee": 10000
+        }
+      ]
+    }
+  ],
+  "calculation_example": {
+    "category_a_example": {
+      "harga_setelah_diskon": 100000,
+      "marketplace_fee": 7500,
+      "payment_fee": 4000,
+      "total_fee": 11500
+    },
+    "category_b_example": {
+      "harga_setelah_diskon": 100000,
+      "marketplace_fee": 8000,
+      "payment_fee": 4000,
+      "total_fee": 12000
+    },
+    "category_a_max_fee_example": {
+      "harga_setelah_diskon": 300000,
+      "marketplace_fee": 22500,
+      "payment_fee": 10000,
+      "total_fee": 32500
+    }
+  }
+} 
