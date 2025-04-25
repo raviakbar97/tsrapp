@@ -117,7 +117,16 @@ function generateReport(specificJsonFile = null) {
       // Calculate derived fields
       const totalBasePrice = basePrice * quantity;
       const subtotal = sellingPricePerUnit * quantity;
-      const mpFee = calculateMpFee(subtotal, productCategory);
+      
+      // Use manually entered MP fee if available, otherwise calculate it
+      let mpFee;
+      if (order["MP Fee Manual"] && !isNaN(parseFloat(order["MP Fee Manual"]))) {
+        mpFee = parseFloat(order["MP Fee Manual"]);
+        console.log(`Using manually entered MP Fee: ${mpFee} for order ${orderNumber}`);
+      } else {
+        mpFee = calculateMpFee(subtotal, productCategory);
+      }
+      
       const earnings = subtotal - mpFee - voucher;
       const margin = earnings - totalBasePrice;
       

@@ -2103,10 +2103,16 @@
           </select>
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm entry-product-name" required placeholder="e.g., TEH RACIK SOLO BENGAWAN">
+          <select class="form-control form-control-sm entry-product-name" required>
+            <option value="">Select Product</option>
+            <!-- Products will be populated by JavaScript -->
+          </select>
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm entry-variation" placeholder="(Optional)">
+          <select class="form-control form-control-sm entry-variation">
+            <option value="">Select Variation</option>
+            <!-- Variations will be populated based on selected product -->
+          </select>
         </td>
         <td>
           <input type="number" class="form-control form-control-sm entry-quantity" min="1" required>
@@ -2145,6 +2151,173 @@
       row.querySelector('.entry-platform').addEventListener('change', function() {
         updateRowColorByPlatform(row, this.value);
       });
+      
+      // Populate product dropdown options
+      populateProductDropdown(row.querySelector('.entry-product-name'));
+      
+      // Add event listener for product selection to update variations
+      row.querySelector('.entry-product-name').addEventListener('change', function() {
+        const productName = this.value;
+        populateVariationDropdown(row.querySelector('.entry-variation'), productName);
+        updateBasePrice(row);
+      });
+      
+      // Add event listener for variation selection to update unit price
+      row.querySelector('.entry-variation').addEventListener('change', function() {
+        updateBasePrice(row);
+      });
+      
+      // Add event listener for quantity change
+      row.querySelector('.entry-quantity').addEventListener('change', function() {
+        updateMpFee(row);
+      });
+      
+      // Add event listener for price change
+      row.querySelector('.entry-price').addEventListener('change', function() {
+        updateMpFee(row);
+      });
+    }
+    
+    // Product catalog cache
+    let productCatalog = null;
+    
+    // Load product catalog data
+    async function loadProductCatalog() {
+      if (productCatalog === null) {
+        try {
+          const response = await fetch('/products-catalog.json');
+          if (!response.ok) {
+            throw new Error(`Failed to load product catalog: ${response.status} ${response.statusText}`);
+          }
+          productCatalog = await response.json();
+          console.log(`Loaded ${productCatalog.products.length} products from catalog`);
+        } catch (error) {
+          console.error('Error loading product catalog:', error);
+          showManualEntryResult('Failed to load product catalog. Please refresh and try again.', 'danger');
+        }
+      }
+      return productCatalog;
+    }
+    
+    // Populate product dropdown
+    async function populateProductDropdown(selectElement) {
+      const catalog = await loadProductCatalog();
+      if (!catalog) return;
+      
+      // Clear existing options except the first one
+      while (selectElement.options.length > 1) {
+        selectElement.remove(1);
+      }
+      
+      // Add each product as an option
+      catalog.products.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.product_name;
+        option.textContent = product.product_name;
+        selectElement.appendChild(option);
+      });
+    }
+    
+    // Populate variation dropdown based on selected product
+    async function populateVariationDropdown(selectElement, productName) {
+      const catalog = await loadProductCatalog();
+      if (!catalog) return;
+      
+      // Clear existing options except the first one
+      while (selectElement.options.length > 1) {
+        selectElement.remove(1);
+      }
+      
+      // Find the selected product
+      const product = catalog.products.find(p => p.product_name === productName);
+      if (!product) return;
+      
+      // Add each variation as an option
+      product.variations.forEach(variation => {
+        const option = document.createElement('option');
+        option.value = variation.name;
+        option.textContent = variation.name;
+        option.dataset.basePrice = variation.base_price;
+        selectElement.appendChild(option);
+      });
+    }
+    
+    // Update base price based on selected product and variation
+    async function updateBasePrice(row) {
+      const catalog = await loadProductCatalog();
+      if (!catalog) return;
+      
+      const productSelect = row.querySelector('.entry-product-name');
+      const variationSelect = row.querySelector('.entry-variation');
+      const priceInput = row.querySelector('.entry-price');
+      
+      if (!productSelect.value) return;
+      
+      // Find the selected product
+      const product = catalog.products.find(p => p.product_name === productSelect.value);
+      if (!product) return;
+      
+      // Find the selected variation or use the first one
+      let basePrice = 0;
+      if (variationSelect.value) {
+        const variation = product.variations.find(v => v.name === variationSelect.value);
+        if (variation) {
+          basePrice = variation.base_price;
+        }
+      } else if (product.variations.length > 0) {
+        basePrice = product.variations[0].base_price;
+      }
+      
+      // Update the price input if it's empty or if it's the default value
+      if (!priceInput.value || priceInput.value === '0') {
+        priceInput.value = basePrice;
+      }
+      
+      // Update MP Fee based on new base price
+      updateMpFee(row);
+    }
+    
+    // Update MP Fee calculation
+    async function updateMpFee(row) {
+      const catalog = await loadProductCatalog();
+      if (!catalog) return;
+      
+      const productSelect = row.querySelector('.entry-product-name');
+      const quantityInput = row.querySelector('.entry-quantity');
+      const priceInput = row.querySelector('.entry-price');
+      const mpFeeInput = row.querySelector('.entry-mpfee');
+      
+      // If any required field is empty, don't update
+      if (!productSelect.value || !quantityInput.value || !priceInput.value) return;
+      
+      const quantity = parseInt(quantityInput.value) || 0;
+      const unitPrice = parseFloat(priceInput.value) || 0;
+      const subtotal = quantity * unitPrice;
+      
+      // Find the product category
+      const product = catalog.products.find(p => p.product_name === productSelect.value);
+      if (!product) return;
+      
+      // Calculate estimated MP Fee (this is the same logic as in generate-report.js)
+      // Note: We're not loading mpfeerules.json here, so this is just an estimate
+      // The server will calculate the actual MP fee using the proper rules
+      let estimatedFee = 0;
+      
+      if (product.category === 'A') {
+        // Category A fee estimate (e.g., 5%)
+        estimatedFee = subtotal * 0.05;
+      } else {
+        // Category B fee estimate (e.g., 7%)
+        estimatedFee = subtotal * 0.07;
+      }
+      
+      // Round to nearest whole number
+      estimatedFee = Math.round(estimatedFee);
+      
+      // Update the MP Fee input if it's empty or if it's the default value
+      if (!mpFeeInput.value || mpFeeInput.value === '0') {
+        mpFeeInput.value = estimatedFee;
+      }
     }
     
     // Update row color based on selected platform
@@ -2247,7 +2420,7 @@
           "Jumlah": quantity,
           "Voucher Ditanggung Penjual": voucher,
           "Platform": platform,
-          "MP Fee Manual": mpFee
+          "MP Fee Manual": mpFee // This will be used in the generateReport function
         };
       });
       

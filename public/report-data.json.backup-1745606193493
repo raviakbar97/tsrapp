@@ -1,8 +1,8 @@
 {
   "summary": {
     "totalOrders": 283,
-    "totalEarnings": 75461016,
-    "averageMargin": 28.442562453033105
+    "totalEarnings": 74828516,
+    "averageMargin": 38.11042437351023
   },
   "orders": [
     {
@@ -4221,34 +4221,34 @@
       "margin": 1093000
     },
     {
-      "orderDate": "2025-04-17T04:31:00.000Z",
+      "orderDate": "2025-04-17T18:31:00.000Z",
       "orderNumber": "INV/20250418/MPL/89871219236",
       "productName": "PAKET USAHA TEH SOLO",
       "variationName": "Gerobak Saja",
       "quantity": 1,
-      "basePrice": 2300000,
-      "totalBasePrice": 2300000,
+      "basePrice": 0,
+      "totalBasePrice": 0,
       "sellingPrice": 3700000,
       "subtotal": 3700000,
-      "mpFee": 20000,
+      "mpFee": 287500,
       "voucher": 0,
-      "earnings": 3680000,
-      "margin": 1380000
+      "earnings": 3412500,
+      "margin": 3412500
     },
     {
-      "orderDate": "2025-04-25T11:31:00.000Z",
+      "orderDate": "2025-04-25T18:31:00.000Z",
       "orderNumber": "INV/20250417/MPL/51453618647",
       "productName": "PAKET USAHA TEH SOLO",
       "variationName": "Gerobak v3 lengkap",
       "quantity": 1,
-      "basePrice": 3497000,
-      "totalBasePrice": 3497000,
+      "basePrice": 0,
+      "totalBasePrice": 0,
       "sellingPrice": 5000000,
       "subtotal": 5000000,
-      "mpFee": 20000,
+      "mpFee": 385000,
       "voucher": 0,
-      "earnings": 4980000,
-      "margin": 1483000
+      "earnings": 4615000,
+      "margin": 4615000
     }
   ]
 }
