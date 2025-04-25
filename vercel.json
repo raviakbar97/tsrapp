@@ -12,6 +12,6 @@
       "destination": "index.js"
     }
   ],
-  "cleanUrls": true,
+  "cleanUrls": false,
   "trailingSlash": false
 }

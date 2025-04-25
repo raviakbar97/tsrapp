@@ -106,6 +106,11 @@ app.get('/simple-editor', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'simple-editor.html'));
 });
 
+// Serve the dashboard page
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
 // Route for uploading and converting Excel file
 app.post('/convert', upload.single('excelFile'), (req, res) => {
   try {
