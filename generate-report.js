@@ -19,6 +19,59 @@ function generateReport(specificJsonFile = null) {
   const productsCatalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'products-catalog.json'), 'utf8'));
   const mpFeeRules = JSON.parse(fs.readFileSync(path.join(__dirname, 'mpfeerules.json'), 'utf8'));
   
+  // Check if report-data.json exists and load it to check for deleted orders
+  const reportDataPath = path.join(__dirname, 'public', 'report-data.json');
+  let deletedOrderNumbers = [];
+  
+  // Check for the deleted-orders.json file which contains permanently deleted orders
+  const deletedOrdersFile = path.join(__dirname, 'deleted-orders.json');
+  if (fs.existsSync(deletedOrdersFile)) {
+    try {
+      const deletedOrdersList = JSON.parse(fs.readFileSync(deletedOrdersFile, 'utf8'));
+      if (Array.isArray(deletedOrdersList)) {
+        deletedOrderNumbers = [...deletedOrdersList];
+        console.log(`Loaded ${deletedOrderNumbers.length} permanently deleted order numbers from deleted-orders.json`);
+      }
+    } catch (err) {
+      console.error('Error reading deleted-orders.json:', err);
+    }
+  }
+  
+  // Also check if report-data.json exists to catch recently deleted orders
+  if (fs.existsSync(reportDataPath)) {
+    try {
+      // Get the existing report data to check for deleted orders
+      const existingReport = JSON.parse(fs.readFileSync(reportDataPath, 'utf8'));
+      
+      // Create a map of order numbers in the existing report
+      const existingOrderMap = new Map();
+      existingReport.orders.forEach(order => {
+        existingOrderMap.set(order.orderNumber, true);
+      });
+      
+      // Check if certain problematic orders exist in orderData.json but not in report-data.json
+      // This would indicate they were manually deleted and should not be reintroduced
+      const problematicOrders = ['INV/20250418/MPL/89871219236', 'INV/20250417/MPL/51453618647'];
+      
+      problematicOrders.forEach(orderNum => {
+        // Check if this order exists in orderData.json
+        const existsInSource = orderData.some(order => order["No. Pesanan"] === orderNum);
+        // Check if this order exists in report-data.json
+        const existsInReport = existingOrderMap.has(orderNum);
+        
+        console.log(`Problematic order check - Order: ${orderNum}, In source: ${existsInSource}, In report: ${existsInReport}`);
+        
+        // If it exists in source but was removed from report, add to deleted list
+        if (existsInSource && !existsInReport && !deletedOrderNumbers.includes(orderNum)) {
+          console.log(`Adding ${orderNum} to deletedOrderNumbers because it was manually removed`);
+          deletedOrderNumbers.push(orderNum);
+        }
+      });
+    } catch (err) {
+      console.error('Error reading existing report data to check for deleted orders:', err);
+    }
+  }
+  
   // Normalize money values function
   function normalizeMoneyValue(value) {
     if (typeof value === 'string') {
@@ -95,6 +148,7 @@ function generateReport(specificJsonFile = null) {
     return product.category;
   }
 
+  // When processing orders, skip any that are in the deletedOrderNumbers list
   const processedOrders = [];
   let totalEarnings = 0;
   let totalMargin = 0;
@@ -104,6 +158,13 @@ function generateReport(specificJsonFile = null) {
       // Extract data from order
       const orderDate = order["Waktu Pembayaran Dilakukan"];
       const orderNumber = order["No. Pesanan"];
+      
+      // Skip this order if it was previously deleted
+      if (deletedOrderNumbers.includes(orderNumber)) {
+        console.log(`Skipping order ${orderNumber} because it was manually deleted from report-data.json`);
+        return;
+      }
+      
       const productName = order["Nama Produk"];
       const variationName = order["Nama Variasi"] || productName; // If no variation, use product name
       const quantity = normalizeMoneyValue(order["Jumlah"]);

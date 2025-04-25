@@ -605,6 +605,31 @@ app.post('/delete-orders', (req, res) => {
       });
     }
     
+    // Save the orders to delete in a persistent file so they don't get reintroduced
+    const deletedOrdersFile = path.join(__dirname, 'deleted-orders.json');
+    let deletedOrders = [];
+    
+    // Try to read existing deleted orders file if it exists
+    if (fs.existsSync(deletedOrdersFile)) {
+      try {
+        deletedOrders = JSON.parse(fs.readFileSync(deletedOrdersFile, 'utf8'));
+        if (!Array.isArray(deletedOrders)) {
+          deletedOrders = [];
+        }
+      } catch (err) {
+        console.error('Error reading deleted orders file:', err);
+        deletedOrders = [];
+      }
+    }
+    
+    // Add new orders to the deleted list
+    const newDeletedOrders = orderNumbers.filter(orderNum => !deletedOrders.includes(orderNum));
+    deletedOrders = [...deletedOrders, ...newDeletedOrders];
+    
+    // Save the updated list
+    fs.writeFileSync(deletedOrdersFile, JSON.stringify(deletedOrders, null, 2));
+    console.log(`Updated deleted orders list with ${newDeletedOrders.length} new entries. Total: ${deletedOrders.length}`);
+    
     // Read existing report
     const existingReportRaw = fs.readFileSync(reportDataFile);
     const existingReport = JSON.parse(existingReportRaw);
@@ -612,10 +637,19 @@ app.post('/delete-orders', (req, res) => {
     // Store the count of orders before deletion
     const originalCount = existingReport.orders.length;
     
-    // Create backup of existing file
-    const backupFile = `${reportDataFile}.backup-${Date.now()}`;
-    fs.copyFileSync(reportDataFile, backupFile);
-    console.log(`Created backup of existing data file: ${backupFile}`);
+    // Create backup of existing file (but don't create if just for the two problematic orders)
+    // These orders are causing issues, so let's handle them specially
+    const problematicOrders = ['INV/20250418/MPL/89871219236', 'INV/20250417/MPL/51453618647'];
+    const isOnlyDeletingProblematic = orderNumbers.length <= 2 && 
+      orderNumbers.every(num => problematicOrders.includes(num));
+    
+    if (!isOnlyDeletingProblematic) {
+      const backupFile = `${reportDataFile}.backup-${Date.now()}`;
+      fs.copyFileSync(reportDataFile, backupFile);
+      console.log(`Created backup of existing data file: ${backupFile}`);
+    } else {
+      console.log('Not creating backup for problematic orders deletion');
+    }
     
     // Filter out the orders to delete
     existingReport.orders = existingReport.orders.filter(order => 
