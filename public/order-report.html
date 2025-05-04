@@ -999,9 +999,24 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // Document ready function
     document.addEventListener('DOMContentLoaded', function() {
-      // Load report data initially
-      loadReportData();
+      // Check if page was reloaded with reload parameter 
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('reload')) {
+        console.log('Page loaded with reload parameter, refreshing report data...');
+        // Remove the reload parameter from the URL without reloading
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        
+        // Force a refresh of the report data
+        setTimeout(() => {
+          loadReportData();
+        }, 500);
+      } else {
+        // Regular page load
+        loadReportData();
+      }
       
       // Set up refresh button
       document.getElementById('refresh-report').addEventListener('click', function() {
@@ -1010,7 +1025,7 @@
         this.disabled = true;
         
         // Force a complete page reload
-        window.location.reload();
+        window.location.href = window.location.pathname + '?reload=' + Date.now();
       });
       
       // Set up back button
@@ -1204,7 +1219,8 @@
           
           // Instead of calling loadReportData(), schedule a full page reload after showing success message
           setTimeout(() => {
-            window.location.reload();
+            // Add timestamp to force a new page load without cache
+            window.location.href = window.location.pathname + '?reload=' + Date.now();
           }, 1500);
         } else {
           // Show error message
@@ -1273,10 +1289,24 @@
     }
     
     function loadReportData() {
-      // Fetch report data with cache-busting parameter
-      fetch(`/report-data.json?_=${new Date().getTime()}`)
-        .then(response => response.json())
+      // Fetch report data with stronger cache-busting parameter
+      const cacheBuster = `_=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      fetch(`/report-data.json?${cacheBuster}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+        .then(response => {
+          console.log('Report data response status:', response.status);
+          if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
         .then(data => {
+          console.log(`Report data received with ${data.orders ? data.orders.length : 0} orders`);
           displayReport(data);
         })
         .catch(error => {
@@ -2516,9 +2546,10 @@
             document.getElementById('manual-entries').innerHTML = '';
             addManualEntryRow();
             
-            // Force a complete page reload after a brief delay
+            // Instead of calling loadReportData(), schedule a full page reload after showing success message
             setTimeout(() => {
-              window.location.reload();
+              // Add timestamp to force a new page load without cache
+              window.location.href = window.location.pathname + '?reload=' + Date.now();
             }, 1500);
           } else {
             showManualEntryResult(`Error: ${data.error}`, 'danger');

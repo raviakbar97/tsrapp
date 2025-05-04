@@ -753,16 +753,26 @@ app.get('/mpfeerules.json', async (req, res) => {
 // API endpoint to serve report data
 app.get('/report-data.json', async (req, res) => {
   try {
-    // Set cache control headers to prevent caching
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    // Set even stronger cache control headers to prevent caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
     res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+    res.set('Expires', '-1');
+    res.set('Surrogate-Control', 'no-store'); // For Vercel and CDNs
     
+    console.log('Fetching report data from MongoDB...');
     const reportData = await getReportData();
+    
     if (!reportData) {
+      console.log('No report data found');
       return res.status(404).json({ error: 'Report data not found' });
     }
-    console.log(`Serving report data with ${reportData.orders ? reportData.orders.length : 0} orders`);
+    
+    const orderCount = reportData.orders ? reportData.orders.length : 0;
+    console.log(`Serving report data with ${orderCount} orders. Timestamp: ${new Date().toISOString()}`);
+    
+    // Add a dynamic timestamp to force browser to recognize as new data
+    reportData.serverTimestamp = Date.now();
+    
     res.json(reportData);
   } catch (error) {
     console.error('Error serving report data:', error);
@@ -975,6 +985,30 @@ cleanupUploadsDirectory();
 if (!isVercel) {
   setInterval(cleanupUploadsDirectory, 3600000); // Run every hour
 }
+
+// Establish initial MongoDB connection to warm up the connection
+async function warmupDatabaseConnection() {
+  try {
+    console.log('Warming up database connection...');
+    const { client, db } = await connectToDatabase();
+    
+    // Check if we can access the database
+    const result = await db.command({ ping: 1 });
+    console.log('Database warmup successful, ping result:', result);
+    
+    // Check existing collections (helps with cold starts)
+    const reportExists = await reportDataExists();
+    console.log('Report data exists:', reportExists);
+    
+    await client.close();
+    console.log('Initial connection closed, warmup complete');
+  } catch (error) {
+    console.error('Database warmup failed:', error);
+  }
+}
+
+// Warmup connection on server start
+warmupDatabaseConnection();
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
