@@ -178,33 +178,33 @@ app.post('/convert', upload.single('excelFile'), async (req, res) => {
         const existingData = await getData(COLLECTIONS.ORDERS);
         
         if (existingData && existingData.length > 0) {
-          // Store the count for reporting
-          existingDataCount = existingData.length;
+        // Store the count for reporting
+        existingDataCount = existingData.length;
+        
+        // Create a map of existing order numbers for quick lookup
+        const existingOrderMap = new Map();
+        existingData.forEach(order => {
+          // Create a unique key using order number and product name
+          const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
+          existingOrderMap.set(key, true);
+        });
+        
+        // Filter out duplicates from the new data
+        const uniqueNewData = newData.filter(order => {
+          const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
+          const isDuplicate = existingOrderMap.has(key);
           
-          // Create a map of existing order numbers for quick lookup
-          const existingOrderMap = new Map();
-          existingData.forEach(order => {
-            // Create a unique key using order number and product name
-            const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
-            existingOrderMap.set(key, true);
-          });
-          
-          // Filter out duplicates from the new data
-          const uniqueNewData = newData.filter(order => {
-            const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
-            const isDuplicate = existingOrderMap.has(key);
-            
-            if (isDuplicate) {
-              duplicateCount++;
-              return false;
-            }
-            return true;
-          });
-          
-          // Combine the datasets
-          finalData = [...existingData, ...uniqueNewData];
-          
-          console.log(`Appending data: ${existingDataCount} existing records, ${uniqueNewData.length} new records added, ${duplicateCount} duplicates skipped`);
+          if (isDuplicate) {
+            duplicateCount++;
+            return false;
+          }
+          return true;
+        });
+        
+        // Combine the datasets
+        finalData = [...existingData, ...uniqueNewData];
+        
+        console.log(`Appending data: ${existingDataCount} existing records, ${uniqueNewData.length} new records added, ${duplicateCount} duplicates skipped`);
         } else {
           finalData = newData;
         }
@@ -237,40 +237,40 @@ app.post('/convert', upload.single('excelFile'), async (req, res) => {
           const existingReport = await getReportData();
           
           if (existingReport && existingReport.orders) {
-            // Create a map of existing order numbers to prevent duplicates
-            const existingOrderMap = new Map();
-            existingReport.orders.forEach(order => {
-              const key = `${order.orderNumber}-${order.productName}`;
-              existingOrderMap.set(key, true);
-            });
-            
-            // Filter out duplicates from the generated report
-            const uniqueNewOrders = generatedReport.orders.filter(order => {
-              const key = `${order.orderNumber}-${order.productName}`;
-              return !existingOrderMap.has(key);
-            });
-            
-            console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
-            
-            // Merge orders
-            const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
-            
-            // Recalculate summary
-            const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
-            const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
-            const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
-            
+          // Create a map of existing order numbers to prevent duplicates
+          const existingOrderMap = new Map();
+          existingReport.orders.forEach(order => {
+            const key = `${order.orderNumber}-${order.productName}`;
+            existingOrderMap.set(key, true);
+          });
+          
+          // Filter out duplicates from the generated report
+          const uniqueNewOrders = generatedReport.orders.filter(order => {
+            const key = `${order.orderNumber}-${order.productName}`;
+            return !existingOrderMap.has(key);
+          });
+          
+          console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+          
+          // Merge orders
+          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+          
+          // Recalculate summary
+          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
+          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
             // Create updated report object
-            const mergedReport = {
+          const mergedReport = {
               generatedAt: new Date(),
-              summary: {
-                totalOrders: mergedOrders.length,
+            summary: {
+              totalOrders: mergedOrders.length,
                 totalEarnings,
                 averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
-              },
-              orders: mergedOrders
-            };
-            
+            },
+            orders: mergedOrders
+          };
+          
             // Save merged report to MongoDB
             await updateReportData(mergedReport);
             
@@ -305,8 +305,8 @@ app.post('/convert', upload.single('excelFile'), async (req, res) => {
       }
     }
     
-    res.json({
-      success: true,
+    res.json({ 
+      success: true, 
       message: shouldAppend ? 'File processed and data appended successfully' : 'File converted successfully and report generated',
       fileName: 'orderData.json',
       totalRows: jsonData.length,
@@ -440,6 +440,87 @@ app.get('/files', async (req, res) => {
   }
 });
 
+// Function to establish MongoDB connection as early as possible and keep it warm
+async function warmupDatabaseConnection() {
+  try {
+    console.log('Warming up database connection...');
+    // Import the MongoDB module
+    const { MongoClient } = require('mongodb');
+    
+    // Create a client with connection pooling
+    const client = new MongoClient(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000
+    });
+    
+    // Connect and test the connection
+    await client.connect();
+    const db = client.db('myApp');
+    
+    // Check if we can access the database
+    const result = await db.command({ ping: 1 });
+    console.log('Database warmup successful, ping result:', result);
+    
+    // List all collections to preload connection info
+    const collections = await db.listCollections().toArray();
+    console.log(`MongoDB collections available: ${collections.map(c => c.name).join(', ')}`);
+    
+    // Store the client in global scope to reuse the connection
+    global.mongoClient = client;
+    global.mongoDb = db;
+    
+    console.log('MongoDB connection pooling established and ready');
+    return { client, db };
+  } catch (error) {
+    console.error('Database warmup failed:', error);
+    throw error;
+  }
+}
+
+// Warmup connection on server start and retry if it fails
+(async function initializeDatabase() {
+  try {
+    await warmupDatabaseConnection();
+  } catch (error) {
+    console.error('Initial database connection failed, will retry in 5 seconds:', error);
+    setTimeout(initializeDatabase, 5000);
+  }
+})();
+
+// API endpoint to serve report data
+app.get('/report-data.json', async (req, res) => {
+  try {
+    // Set even stronger cache control headers to prevent caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '-1');
+    res.set('Surrogate-Control', 'no-store'); // For Vercel and CDNs
+    
+    console.log('Fetching report data from MongoDB...');
+    const reportData = await getReportData();
+    
+    if (!reportData) {
+      console.log('No report data found');
+      return res.status(404).json({ error: 'Report data not found' });
+    }
+    
+    const orderCount = reportData.orders ? reportData.orders.length : 0;
+    console.log(`Serving report data with ${orderCount} orders. Timestamp: ${new Date().toISOString()}`);
+    
+    // Add a dynamic timestamp to force browser to recognize as new data
+    reportData.serverTimestamp = Date.now();
+    reportData.requestId = Math.random().toString(36).substring(2, 15);
+    
+    res.json(reportData);
+  } catch (error) {
+    console.error('Error serving report data:', error);
+    res.status(500).json({ error: 'Failed to retrieve report data' });
+  }
+});
+
 // Handle manual entry of order data
 app.post('/manual-entry', async (req, res) => {
   try {
@@ -451,8 +532,6 @@ app.post('/manual-entry', async (req, res) => {
     
     // For debugging
     console.log(`Received manual entry data: ${JSON.stringify(orders[0], null, 2).substring(0, 300)}...`);
-    
-    // Path to the report data file
     console.log(`Processing ${orders.length} manually entered orders (Append mode: ${appendData})`);
     
     // Get product catalog from MongoDB
@@ -538,9 +617,16 @@ app.post('/manual-entry', async (req, res) => {
           // Combine existing and new orders
           const combinedOrders = [...filteredExistingOrders, ...processedOrders];
           
+          // Log order counts for debugging
+          console.log(`Manual entry - existing orders: ${existingReport.orders.length}`);
+          console.log(`Manual entry - new orders: ${processedOrders.length}`);
+          console.log(`Manual entry - filtered existing orders: ${filteredExistingOrders.length}`);
+          console.log(`Manual entry - combined orders: ${combinedOrders.length}`);
+          
           // Recalculate summary
           const totalEarnings = combinedOrders.reduce((sum, order) => sum + order.earnings, 0);
           const totalMargin = combinedOrders.reduce((sum, order) => sum + order.margin, 0);
+          const totalRevenue = combinedOrders.reduce((sum, order) => sum + order.subtotal, 0);
           
           // Create updated report
           updatedReport = {
@@ -548,7 +634,8 @@ app.post('/manual-entry', async (req, res) => {
             summary: {
               totalOrders: combinedOrders.length,
               totalEarnings,
-              averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+              totalRevenue,
+              averageMargin: totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0
             },
             orders: combinedOrders
           };
@@ -556,43 +643,60 @@ app.post('/manual-entry', async (req, res) => {
           // Create new report with just the manual orders
           const totalEarnings = processedOrders.reduce((sum, order) => sum + order.earnings, 0);
           const totalMargin = processedOrders.reduce((sum, order) => sum + order.margin, 0);
+          const totalRevenue = processedOrders.reduce((sum, order) => sum + order.subtotal, 0);
           
           updatedReport = {
             generatedAt: new Date(),
             summary: {
               totalOrders: processedOrders.length,
               totalEarnings,
-              averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+              totalRevenue,
+              averageMargin: totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0
             },
             orders: processedOrders
           };
-        }
-      } else {
+      }
+    } else {
         // Create new report with just the manual orders
         const totalEarnings = processedOrders.reduce((sum, order) => sum + order.earnings, 0);
         const totalMargin = processedOrders.reduce((sum, order) => sum + order.margin, 0);
+        const totalRevenue = processedOrders.reduce((sum, order) => sum + order.subtotal, 0);
         
         updatedReport = {
           generatedAt: new Date(),
           summary: {
             totalOrders: processedOrders.length,
             totalEarnings,
-            averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+            totalRevenue,
+            averageMargin: totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0
           },
           orders: processedOrders
         };
       }
       
       // Save updated report to MongoDB
-      await updateReportData(updatedReport);
-      console.log(`Manual entry data saved to MongoDB with ${updatedReport.orders.length} orders`);
+      const updateResult = await updateReportData(updatedReport);
+      console.log(`Manual entry data saved to MongoDB with ${updatedReport.orders.length} orders. Result:`, updateResult);
       
-      res.json({
-        success: true,
+      // Make sure Vercel edge cache is purged
+      try {
+        const purgeUrls = [
+          `${req.protocol}://${req.get('host')}/report-data.json`
+        ];
+        
+        console.log(`Attempting to purge cache for: ${purgeUrls.join(', ')}`);
+      } catch (purgeError) {
+        console.error('Error attempting cache purge:', purgeError);
+      }
+    
+    res.json({
+      success: true,
         message: `${processedOrders.length} manual orders saved successfully.`,
-        count: processedOrders.length
-      });
-    } catch (error) {
+        count: processedOrders.length,
+        totalCount: updatedReport.orders.length,
+        timestamp: Date.now()
+    });
+  } catch (error) {
       console.error('Error processing manual entry:', error);
       res.status(500).json({ success: false, error: error.message });
     }
@@ -671,8 +775,8 @@ app.post('/backup-report', async (req, res) => {
     const reportData = await getReportData();
     
     if (!reportData) {
-      return res.status(404).json({
-        success: false,
+      return res.status(404).json({ 
+        success: false, 
         error: 'Report data not found'
       });
     }
@@ -750,36 +854,6 @@ app.get('/mpfeerules.json', async (req, res) => {
   }
 });
 
-// API endpoint to serve report data
-app.get('/report-data.json', async (req, res) => {
-  try {
-    // Set even stronger cache control headers to prevent caching
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '-1');
-    res.set('Surrogate-Control', 'no-store'); // For Vercel and CDNs
-    
-    console.log('Fetching report data from MongoDB...');
-    const reportData = await getReportData();
-    
-    if (!reportData) {
-      console.log('No report data found');
-      return res.status(404).json({ error: 'Report data not found' });
-    }
-    
-    const orderCount = reportData.orders ? reportData.orders.length : 0;
-    console.log(`Serving report data with ${orderCount} orders. Timestamp: ${new Date().toISOString()}`);
-    
-    // Add a dynamic timestamp to force browser to recognize as new data
-    reportData.serverTimestamp = Date.now();
-    
-    res.json(reportData);
-  } catch (error) {
-    console.error('Error serving report data:', error);
-    res.status(500).json({ error: 'Failed to retrieve report data' });
-  }
-});
-
 // Route for filtering JSON file by date range
 app.post('/filter-json', async (req, res) => {
   try {
@@ -832,44 +906,44 @@ app.post('/filter-json', async (req, res) => {
           const existingReport = await getReportData();
           
           if (existingReport && existingReport.orders) {
-            // Create a map of existing order numbers to prevent duplicates
-            const existingOrderMap = new Map();
-            existingReport.orders.forEach(order => {
-              const key = `${order.orderNumber}-${order.productName}`;
-              existingOrderMap.set(key, true);
-            });
-            
-            // Filter out duplicates from the generated report
-            const uniqueNewOrders = generatedReport.orders.filter(order => {
-              const key = `${order.orderNumber}-${order.productName}`;
-              return !existingOrderMap.has(key);
-            });
-            
-            console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
-            
-            // Merge orders
-            const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
-            
-            // Recalculate summary
-            const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
-            const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
-            
+        // Create a map of existing order numbers to prevent duplicates
+        const existingOrderMap = new Map();
+        existingReport.orders.forEach(order => {
+          const key = `${order.orderNumber}-${order.productName}`;
+          existingOrderMap.set(key, true);
+        });
+        
+        // Filter out duplicates from the generated report
+        const uniqueNewOrders = generatedReport.orders.filter(order => {
+          const key = `${order.orderNumber}-${order.productName}`;
+          return !existingOrderMap.has(key);
+        });
+        
+        console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+        
+          // Merge orders
+          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+          
+          // Recalculate summary
+          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
             // Create updated report object
-            const mergedReport = {
+          const mergedReport = {
               generatedAt: new Date(),
-              summary: {
-                totalOrders: mergedOrders.length,
+            summary: {
+              totalOrders: mergedOrders.length,
                 totalEarnings,
                 averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
-              },
-              orders: mergedOrders
-            };
-            
+            },
+            orders: mergedOrders
+          };
+          
             // Save merged report to MongoDB
             await updateReportData(mergedReport);
             
             console.log(`Merged report saved to MongoDB with ${mergedOrders.length} orders`);
-          } else {
+        } else {
             // If existing report doesn't have orders array, just save the generated report
             await updateReportData(generatedReport);
             console.log(`No valid existing report found, saving new report with ${generatedReport.orders.length} orders`);
@@ -877,8 +951,8 @@ app.post('/filter-json', async (req, res) => {
         } catch (err) {
           console.error('Error merging with existing report, saving new report instead:', err);
           await updateReportData(generatedReport);
-        }
-      } else {
+      }
+    } else {
         // If report doesn't exist, just save the generated report
         await updateReportData(generatedReport);
         console.log(`No existing report found, saving new report with ${generatedReport.orders.length} orders`);
@@ -888,8 +962,8 @@ app.post('/filter-json', async (req, res) => {
       // Continue with the response even if report generation fails
     }
     
-    res.json({
-      success: true,
+    res.json({ 
+      success: true, 
       message: `Filtered data saved successfully. ${filteredData.length} orders matched the date range.`,
       filteredCount: filteredData.length,
       totalCount: orderData.length
@@ -986,34 +1060,10 @@ if (!isVercel) {
   setInterval(cleanupUploadsDirectory, 3600000); // Run every hour
 }
 
-// Establish initial MongoDB connection to warm up the connection
-async function warmupDatabaseConnection() {
-  try {
-    console.log('Warming up database connection...');
-    const { client, db } = await connectToDatabase();
-    
-    // Check if we can access the database
-    const result = await db.command({ ping: 1 });
-    console.log('Database warmup successful, ping result:', result);
-    
-    // Check existing collections (helps with cold starts)
-    const reportExists = await reportDataExists();
-    console.log('Report data exists:', reportExists);
-    
-    await client.close();
-    console.log('Initial connection closed, warmup complete');
-  } catch (error) {
-    console.error('Database warmup failed:', error);
-  }
-}
-
-// Warmup connection on server start
-warmupDatabaseConnection();
-
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log(`Product Editor available at http://localhost:${port}/product-editor`);
-});
+}); 
 
 // Cleanup history:
 // The following files were moved to the backup directory as they're no longer needed:

@@ -1009,13 +1009,15 @@
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
         
-        // Force a refresh of the report data
+        // Force a refresh of the report data with a small delay to ensure MongoDB connection is ready
+        setTimeout(() => {
+          loadReportData();
+        }, 800);
+      } else {
+        // Regular page load - still use a small delay to ensure MongoDB connection is established
         setTimeout(() => {
           loadReportData();
         }, 500);
-      } else {
-        // Regular page load
-        loadReportData();
       }
       
       // Set up refresh button
@@ -1024,8 +1026,9 @@
         this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-1"></i> Refreshing...';
         this.disabled = true;
         
-        // Force a complete page reload
-        window.location.href = window.location.pathname + '?reload=' + Date.now();
+        // Force a complete page reload with aggressive cache-busting
+        const cacheBuster = Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+        window.location.href = window.location.pathname + '?reload=' + cacheBuster;
       });
       
       // Set up back button
@@ -1168,10 +1171,20 @@
       // Disable the upload button
       document.getElementById('upload-file-btn').disabled = true;
       
-      // Make the AJAX request
-      fetch('/convert', {
+      // Add cache busting parameter to URL
+      const cacheBuster = `_nocache=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      console.log('Uploading Excel file with cache buster:', cacheBuster);
+      
+      // Make the AJAX request with cache busting
+      fetch(`/convert?${cacheBuster}`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store'
       })
       .then(response => {
         if (!response.ok) {
@@ -1217,11 +1230,19 @@
           uploadResult.innerHTML = resultHtml;
           uploadResult.className = 'alert alert-success';
           
-          // Instead of calling loadReportData(), schedule a full page reload after showing success message
+          // Close the modal after a delay
           setTimeout(() => {
-            // Add timestamp to force a new page load without cache
-            window.location.href = window.location.pathname + '?reload=' + Date.now();
-          }, 1500);
+            const modalElement = document.getElementById('uploadModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+              modalInstance.hide();
+            }
+            
+            // Force a complete page reload with aggressive cache busting
+            const reloadCacheBuster = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+            console.log('Forcing hard reload after upload with cache buster:', reloadCacheBuster);
+            window.location.href = `${window.location.pathname}?reload=${reloadCacheBuster}`;
+          }, 2000);
         } else {
           // Show error message
           uploadResult.textContent = `Error: ${data.error}`;
@@ -1238,6 +1259,8 @@
         uploadResult.textContent = `Upload failed: ${error.message}`;
         uploadResult.className = 'alert alert-danger';
         uploadResult.classList.remove('d-none');
+        
+        console.error('File upload error:', error);
       })
       .finally(() => {
         // Re-enable the upload button
@@ -1289,14 +1312,26 @@
     }
     
     function loadReportData() {
-      // Fetch report data with stronger cache-busting parameter
-      const cacheBuster = `_=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      // Create a unique timestamp + random string for stronger cache busting
+      const randomStr = Math.random().toString(36).substring(2, 15);
+      const timestamp = Date.now();
+      const cacheBuster = `_nocache=${timestamp}_${randomStr}`;
+      
+      console.log(`Loading report data with cache buster: ${cacheBuster}`);
+      
+      // Display loading state in dashboard
+      document.getElementById('total-orders').textContent = 'Loading...';
+      document.getElementById('total-revenue').textContent = 'Loading...';
+      
+      // Fetch report data with stronger cache-busting parameters
       fetch(`/report-data.json?${cacheBuster}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+          'Expires': '0',
+          'X-Requested-With': 'XMLHttpRequest' // Helps some CDNs recognize AJAX requests
+        },
+        cache: 'no-store' // Strongest fetch API cache setting
       })
         .then(response => {
           console.log('Report data response status:', response.status);
@@ -1306,7 +1341,7 @@
           return response.json();
         })
         .then(data => {
-          console.log(`Report data received with ${data.orders ? data.orders.length : 0} orders`);
+          console.log(`Report data received with ${data.orders ? data.orders.length : 0} orders (server timestamp: ${data.serverTimestamp})`);
           displayReport(data);
         })
         .catch(error => {
@@ -2492,14 +2527,6 @@
       const isAppendMode = document.getElementById('manualAppendMode').checked;
       
       try {
-        // Create a simple JSON string for transmission
-        const jsonData = JSON.stringify(entriesToSave);
-        
-        // Prepare data for submission
-        // const formData = new FormData();
-        // formData.append('manualData', jsonData);
-        // formData.append('appendData', isAppendMode ? 'true' : 'false');
-        
         // Log the data being sent (for debugging)
         console.log('Sending manual entry data:', entriesToSave.length, 'entries');
         
@@ -2507,17 +2534,24 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
+        // Add cache busting parameter to URL to avoid stale responses
+        const cacheBuster = `_nocache=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        
         // Send data to the server
-        fetch('/manual-entry', {
+        fetch(`/manual-entry?${cacheBuster}`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           },
           body: JSON.stringify({ 
             orders: entriesToSave,
             appendData: isAppendMode
           }),
-          signal: controller.signal
+          signal: controller.signal,
+          cache: 'no-store'
         })
         .then(response => {
           clearTimeout(timeoutId);
@@ -2538,7 +2572,7 @@
           if (data.success) {
             // Show success message
             showManualEntryResult(
-              `${entriesToSave.length} orders added successfully. ${isAppendMode ? 'Data has been appended.' : 'Data has been replaced.'}`,
+              `${entriesToSave.length} orders added successfully. Total orders: ${data.totalCount || 'N/A'}`,
               'success'
             );
             
@@ -2546,10 +2580,14 @@
             document.getElementById('manual-entries').innerHTML = '';
             addManualEntryRow();
             
-            // Instead of calling loadReportData(), schedule a full page reload after showing success message
+            // Close the modal after a delay
             setTimeout(() => {
-              // Add timestamp to force a new page load without cache
-              window.location.href = window.location.pathname + '?reload=' + Date.now();
+              const modalElement = document.getElementById('manualEntryModal');
+              const modalInstance = bootstrap.Modal.getInstance(modalElement);
+              modalInstance.hide();
+              
+              // Force a complete page reload with cache busting
+              window.location.href = `${window.location.pathname}?reload=${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
             }, 1500);
           } else {
             showManualEntryResult(`Error: ${data.error}`, 'danger');
@@ -2594,6 +2632,13 @@
       resultEl.textContent = message;
       resultEl.className = `alert alert-${type}`;
       resultEl.classList.remove('d-none');
+    }
+
+    // Add this new function to trigger a hard reload
+    function forceHardReload() {
+      const cacheBuster = Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+      console.log('Forcing hard reload with cache buster:', cacheBuster);
+      window.location.href = window.location.pathname + '?reload=' + cacheBuster;
     }
   </script>
 </body>
