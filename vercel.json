@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "index.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node@latest"
     }
   ],
   "rewrites": [
@@ -15,6 +15,7 @@
   "cleanUrls": false,
   "trailingSlash": false,
   "env": {
-    "VERCEL": "1"
+    "VERCEL": "1",
+    "NODE_OPTIONS": "--tls-min-v1.2"
   }
 }

@@ -21,9 +21,30 @@ async function connectToDatabase() {
     throw new Error('MONGODB_URI environment variable is not set');
   }
 
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  return { client, db: client.db(dbName) };
+  // MongoDB connection options
+  const options = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 15000, // Longer timeout for Vercel
+    connectTimeoutMS: 15000,
+    socketTimeoutMS: 45000,
+    ssl: true,
+    tls: true,
+    tlsCAFile: null, // Let MongoDB driver handle the certificates
+    maxPoolSize: 10,
+    minPoolSize: 5
+  };
+
+  try {
+    console.log('Connecting to MongoDB...');
+    const client = new MongoClient(process.env.MONGODB_URI, options);
+    await client.connect();
+    console.log('Successfully connected to MongoDB');
+    return { client, db: client.db(dbName) };
+  } catch (error) {
+    console.error('Failed to connect to MongoDB:', error);
+    throw error;
+  }
 }
 
 // Save data to a collection
