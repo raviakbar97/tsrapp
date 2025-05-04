@@ -1085,14 +1085,23 @@ app.post('/save-json-data', upload.single('jsonFile'), async (req, res) => {
     
     console.log('Received edited data from simple editor');
     
-    // Read the uploaded JSON file
-    const jsonData = fs.readFileSync(req.file.path, 'utf8');
-    let reportData;
+    // Read the uploaded JSON data - handle both memory storage and disk storage
+    let jsonData;
+    if (isVercel || req.file.buffer) {
+      // For memory storage (Vercel)
+      console.log('Reading file from memory buffer');
+      jsonData = req.file.buffer.toString('utf8');
+    } else {
+      // For disk storage (local development)
+      console.log('Reading file from disk at path:', req.file.path);
+      jsonData = fs.readFileSync(req.file.path, 'utf8');
+    }
     
+    let reportData;
     try {
       reportData = JSON.parse(jsonData);
     } catch (error) {
-      return res.status(400).json({ error: 'Invalid JSON data' });
+      return res.status(400).json({ error: 'Invalid JSON data: ' + error.message });
     }
     
     // Add missing fields that should be in the report data
@@ -1124,8 +1133,10 @@ app.post('/save-json-data', upload.single('jsonFile'), async (req, res) => {
     // Save to MongoDB
     await updateReportData(reportData);
     
-    // Clean up the temporary file
-    fs.unlinkSync(req.file.path);
+    // Clean up the temporary file if it exists
+    if (!isVercel && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     
     res.json({ 
       success: true, 
