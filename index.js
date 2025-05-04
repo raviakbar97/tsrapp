@@ -706,65 +706,72 @@ app.post('/manual-entry', async (req, res) => {
   }
 });
 
-// API endpoint to delete orders from the report
-app.post('/delete-orders', async (req, res) => {
+// Endpoint to delete specific problematic orders
+app.post('/delete-orders', express.json(), async (req, res) => {
   try {
     const { orderNumbers } = req.body;
     
     if (!orderNumbers || !Array.isArray(orderNumbers) || orderNumbers.length === 0) {
-      return res.status(400).json({ success: false, error: 'Invalid order numbers provided' });
+      return res.status(400).json({ error: 'Invalid order numbers provided' });
     }
     
-    // Get existing report data from MongoDB
+    console.log(`Request to delete specific orders: ${orderNumbers.join(', ')}`);
+    
+    // Get current report data
     const reportData = await getReportData();
     
     if (!reportData || !reportData.orders) {
-      return res.status(404).json({ success: false, error: 'Report data not found' });
+      return res.status(404).json({ error: 'Report data not found' });
     }
     
-    // Save the deleted order numbers to the deleted orders collection
-    let deletedOrdersList = await getData(COLLECTIONS.DELETED_ORDERS) || [];
-    
-    // Add the new deleted order numbers to the list (avoid duplicates)
-    orderNumbers.forEach(orderNumber => {
-      if (!deletedOrdersList.includes(orderNumber)) {
-        deletedOrdersList.push(orderNumber);
-      }
-    });
-    
-    // Save the updated deleted orders list
-    await saveData(COLLECTIONS.DELETED_ORDERS, deletedOrdersList);
-    
-    // Filter out the deleted orders from the report
-    const updatedOrders = reportData.orders.filter(order => !orderNumbers.includes(order.orderNumber));
+    // Filter out the specified orders
+    const originalCount = reportData.orders.length;
+    reportData.orders = reportData.orders.filter(order => !orderNumbers.includes(order.orderNumber));
+    const deletedCount = originalCount - reportData.orders.length;
     
     // Recalculate summary
-    const totalEarnings = updatedOrders.reduce((sum, order) => sum + order.earnings, 0);
-    const totalMargin = updatedOrders.reduce((sum, order) => sum + order.margin, 0);
+    const totalEarnings = reportData.orders.reduce((sum, order) => sum + order.earnings, 0);
+    const totalRevenue = reportData.orders.reduce((sum, order) => sum + order.subtotal, 0);
+    const totalMargin = reportData.orders.reduce((sum, order) => sum + order.margin, 0);
     
-    // Create updated report object
-    const updatedReport = {
-      generatedAt: new Date(),
-      summary: {
-        totalOrders: updatedOrders.length,
-        totalEarnings,
-        averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
-      },
-      orders: updatedOrders
+    reportData.summary = {
+      totalOrders: reportData.orders.length,
+      totalEarnings,
+      totalRevenue,
+      averageMargin: totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0
     };
     
-    // Save updated report to MongoDB
-    await updateReportData(updatedReport);
+    // Save the updated data to MongoDB
+    await updateReportData(reportData);
+    
+    // Add the deleted order numbers to the permanent deleted orders list
+    try {
+      let deletedOrdersList = await getData(COLLECTIONS.DELETED_ORDERS);
+      if (!deletedOrdersList) {
+        deletedOrdersList = [];
+      }
+      
+      // Add the order numbers if they're not already in the list
+      const newDeletedOrders = orderNumbers.filter(num => !deletedOrdersList.includes(num));
+      if (newDeletedOrders.length > 0) {
+        const updatedDeletedOrders = [...deletedOrdersList, ...newDeletedOrders];
+        await saveData(COLLECTIONS.DELETED_ORDERS, updatedDeletedOrders);
+        console.log(`Added ${newDeletedOrders.length} orders to permanent deletion list`);
+      }
+    } catch (error) {
+      console.error('Error updating deleted orders list:', error);
+      // Continue anyway since the main operation succeeded
+    }
     
     res.json({
       success: true,
-      message: `${orderNumbers.length} orders deleted successfully.`,
-      deletedCount: orderNumbers.length,
-      remainingCount: updatedOrders.length
+      deletedCount,
+      totalCount: reportData.orders.length,
+      message: `Successfully deleted ${deletedCount} orders`
     });
   } catch (error) {
     console.error('Error deleting orders:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ error: 'Failed to delete orders: ' + error.message });
   }
 });
 
@@ -1067,6 +1074,67 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] API request for report data - serving from MongoDB`);
   }
   next();
+});
+
+// Endpoint to save edited JSON data from simple editor
+app.post('/save-json-data', upload.single('jsonFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+    
+    console.log('Received edited data from simple editor');
+    
+    // Read the uploaded JSON file
+    const jsonData = fs.readFileSync(req.file.path, 'utf8');
+    let reportData;
+    
+    try {
+      reportData = JSON.parse(jsonData);
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid JSON data' });
+    }
+    
+    // Add missing fields that should be in the report data
+    if (!reportData.generatedAt) {
+      reportData.generatedAt = new Date();
+    }
+    
+    // Make sure the orders array exists
+    if (!reportData.orders) {
+      reportData.orders = [];
+    }
+    
+    // Verify the summary has all required fields
+    if (!reportData.summary) {
+      const totalEarnings = reportData.orders.reduce((sum, order) => sum + order.earnings, 0);
+      const totalSubtotal = reportData.orders.reduce((sum, order) => sum + order.subtotal, 0);
+      const totalMargin = reportData.orders.reduce((sum, order) => sum + order.margin, 0);
+      
+      reportData.summary = {
+        totalOrders: reportData.orders.length,
+        totalEarnings: totalEarnings,
+        totalRevenue: totalSubtotal,
+        averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
+      };
+    }
+    
+    console.log(`Saving edited report with ${reportData.orders.length} orders to MongoDB`);
+    
+    // Save to MongoDB
+    await updateReportData(reportData);
+    
+    // Clean up the temporary file
+    fs.unlinkSync(req.file.path);
+    
+    res.json({ 
+      success: true, 
+      message: `Successfully saved report data with ${reportData.orders.length} orders` 
+    });
+  } catch (error) {
+    console.error('Error saving edited JSON data:', error);
+    res.status(500).json({ error: 'Failed to save data: ' + error.message });
+  }
 });
 
 app.listen(port, () => {

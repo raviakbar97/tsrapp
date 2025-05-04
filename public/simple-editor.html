@@ -228,7 +228,17 @@
     // Load data
     async function loadData() {
       try {
-        const response = await fetch('/report-data.json');
+        // Add cache busting to avoid stale data
+        const cacheBuster = `_nocache=${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        const response = await fetch(`/report-data.json?${cacheBuster}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+          cache: 'no-store'
+        });
+        
         if (!response.ok) {
           throw new Error(`Failed to load data: ${response.status} ${response.statusText}`);
         }
@@ -240,8 +250,8 @@
         // Display data
         displayData();
         
-        // Show data count
-        document.getElementById('data-count').textContent = `Total: ${reportData.orders.length} orders`;
+        // Show data count and timestamp
+        document.getElementById('data-count').textContent = `Total: ${reportData.orders ? reportData.orders.length : 0} orders (Last updated: ${new Date(reportData.generatedAt || Date.now()).toLocaleString()})`;
       } catch (error) {
         console.error('Error loading data:', error);
         showStatus(`Error loading data: ${error.message}`, 'danger');
