@@ -1060,6 +1060,15 @@ if (!isVercel) {
   setInterval(cleanupUploadsDirectory, 3600000); // Run every hour
 }
 
+// Add a middleware to log attempts to access the static report-data.json file
+app.use((req, res, next) => {
+  // If someone tries to access the static report-data.json file directly
+  if (req.path === '/report-data.json' && req.method === 'GET') {
+    console.log(`[${new Date().toISOString()}] API request for report data - serving from MongoDB`);
+  }
+  next();
+});
+
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log(`Product Editor available at http://localhost:${port}/product-editor`);
