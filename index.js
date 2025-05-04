@@ -1,14 +1,27 @@
+require('dotenv').config();
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const XLSX = require('xlsx');
+const { MongoClient } = require('mongodb');
+
+// Import the database utility module
+const { 
+  saveData, 
+  getData, 
+  getReportData, 
+  updateReportData, 
+  reportDataExists,
+  COLLECTIONS 
+} = require('./db');
 
 // Import the report generation functions
 const generateReport = require('./generate-report');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Check if we're running on Vercel
 const isVercel = process.env.VERCEL === '1';
@@ -117,13 +130,14 @@ app.get('/dashboard', (req, res) => {
 });
 
 // Route for uploading and converting Excel file
-app.post('/convert', upload.single('excelFile'), (req, res) => {
+app.post('/convert', upload.single('excelFile'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
     let workbook;
+    let filePath;
     
     // Handle file based on storage type
     if (isVercel) {
@@ -131,7 +145,7 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
       workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
     } else {
       // For disk storage (local development)
-      const filePath = req.file.path;
+      filePath = req.file.path;
       workbook = XLSX.readFile(filePath);
     }
     
@@ -148,55 +162,52 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
     // Filter and keep only necessary fields
     const newData = filterNecessaryFields(filteredByStatus);
     
-    // Standard output filename
-    const outputFilename = 'orderData.json';
-    const outputPath = path.join(__dirname, outputFilename);
-    
-    // Check if we should append or replace (default is replace)
-    const shouldAppend = req.body.appendData === 'true';
-    
     // Get the count of new records for reporting
     const newDataCount = newData.length;
     let existingDataCount = 0;
     let duplicateCount = 0;
     let finalData = [];
     
-    // If append mode and the file exists, read and merge with existing data
-    if (shouldAppend && fs.existsSync(outputPath)) {
+    // Check if we should append or replace (default is replace)
+    const shouldAppend = req.body.appendData === 'true';
+    
+    // If append mode and there's existing data, read and merge with existing data
+    if (shouldAppend) {
       try {
-        // Read existing data
-        const existingDataRaw = fs.readFileSync(outputPath);
-        const existingData = JSON.parse(existingDataRaw);
+        // Get existing data from MongoDB
+        const existingData = await getData(COLLECTIONS.ORDERS);
         
-        // Store the count for reporting
-        existingDataCount = existingData.length;
-        
-        // Create a map of existing order numbers for quick lookup
-        const existingOrderMap = new Map();
-        existingData.forEach(order => {
-          // Create a unique key using order number and product name
-          // Use the actual field names from the JSON data structure
-          const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
-          existingOrderMap.set(key, true);
-        });
-        
-        // Filter out duplicates from the new data
-        const uniqueNewData = newData.filter(order => {
-          // Use the actual field names from the JSON data structure
-          const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
-          const isDuplicate = existingOrderMap.has(key);
+        if (existingData && existingData.length > 0) {
+          // Store the count for reporting
+          existingDataCount = existingData.length;
           
-          if (isDuplicate) {
-            duplicateCount++;
-            return false;
-          }
-          return true;
-        });
-        
-        // Combine the datasets
-        finalData = [...existingData, ...uniqueNewData];
-        
-        console.log(`Appending data: ${existingDataCount} existing records, ${uniqueNewData.length} new records added, ${duplicateCount} duplicates skipped`);
+          // Create a map of existing order numbers for quick lookup
+          const existingOrderMap = new Map();
+          existingData.forEach(order => {
+            // Create a unique key using order number and product name
+            const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
+            existingOrderMap.set(key, true);
+          });
+          
+          // Filter out duplicates from the new data
+          const uniqueNewData = newData.filter(order => {
+            const key = `${order["No. Pesanan"]}-${order["Nama Produk"]}`;
+            const isDuplicate = existingOrderMap.has(key);
+            
+            if (isDuplicate) {
+              duplicateCount++;
+              return false;
+            }
+            return true;
+          });
+          
+          // Combine the datasets
+          finalData = [...existingData, ...uniqueNewData];
+          
+          console.log(`Appending data: ${existingDataCount} existing records, ${uniqueNewData.length} new records added, ${duplicateCount} duplicates skipped`);
+        } else {
+          finalData = newData;
+        }
       } catch (err) {
         console.error('Error reading existing data, will replace instead:', err);
         finalData = newData;
@@ -207,92 +218,97 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
       console.log(`Replacing data with ${newDataCount} records`);
     }
     
-    // Write JSON to file
-    fs.writeFileSync(outputPath, JSON.stringify(finalData, null, 2));
+    // Save data to MongoDB
+    await saveData(COLLECTIONS.ORDERS, finalData);
     
-    // Automatically generate report using the newly created JSON file
+    // Automatically generate report using the data
     try {
-      // Instead of replacing report-data.json, we'll append the data from orderData.json
-      const generatedReport = generateReport(outputPath);
+      // Generate report using data directly (no file path needed)
+      const generatedReport = await generateReport(finalData);
       
-      // After generating the report, we need to merge with existing report data
-      const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+      // Check if report data exists in MongoDB
+      const reportExists = await reportDataExists();
       
-      // If report-data.json exists, we'll merge with it
-      if (fs.existsSync(reportDataFile)) {
-        console.log('Existing report-data.json found, merging with new data');
+      if (reportExists) {
+        console.log('Existing report data found in MongoDB, merging with new data');
         
         try {
-          // Read existing report data
-          const existingReport = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
+          // Get existing report data
+          const existingReport = await getReportData();
           
-          // Create a map of existing order numbers to prevent duplicates
-          const existingOrderMap = new Map();
-          existingReport.orders.forEach(order => {
-            const key = `${order.orderNumber}-${order.productName}`;
-            existingOrderMap.set(key, true);
-          });
-          
-          // Filter out duplicates from the generated report
-          const uniqueNewOrders = generatedReport.orders.filter(order => {
-            const key = `${order.orderNumber}-${order.productName}`;
-            return !existingOrderMap.has(key);
-          });
-          
-          console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
-          
-          // Merge orders
-          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
-          
-          // Recalculate summary
-          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
-          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
-          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
-          
-          const mergedReport = {
-            summary: {
-              totalOrders: mergedOrders.length,
-              totalEarnings: totalEarnings,
-              averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
-            },
-            orders: mergedOrders
-          };
-          
-          // Save the merged report
-          fs.writeFileSync(reportDataFile, JSON.stringify(mergedReport, null, 2));
-          console.log(`Successfully merged data into ${reportDataFile}`);
-        } catch (mergeError) {
-          console.error('Error merging with existing report data:', mergeError);
-          
-          // If there's an error merging, just save the generated report as is
-          fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
-          console.log(`Error merging, saved generated report to ${reportDataFile}`);
+          if (existingReport && existingReport.orders) {
+            // Create a map of existing order numbers to prevent duplicates
+            const existingOrderMap = new Map();
+            existingReport.orders.forEach(order => {
+              const key = `${order.orderNumber}-${order.productName}`;
+              existingOrderMap.set(key, true);
+            });
+            
+            // Filter out duplicates from the generated report
+            const uniqueNewOrders = generatedReport.orders.filter(order => {
+              const key = `${order.orderNumber}-${order.productName}`;
+              return !existingOrderMap.has(key);
+            });
+            
+            console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+            
+            // Merge orders
+            const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+            
+            // Recalculate summary
+            const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+            const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
+            const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+            
+            // Create updated report object
+            const mergedReport = {
+              generatedAt: new Date(),
+              summary: {
+                totalOrders: mergedOrders.length,
+                totalEarnings,
+                averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+              },
+              orders: mergedOrders
+            };
+            
+            // Save merged report to MongoDB
+            await updateReportData(mergedReport);
+            
+            console.log(`Merged report saved to MongoDB with ${mergedOrders.length} orders`);
+          } else {
+            // If existing report doesn't have orders array, just save the generated report
+            await updateReportData(generatedReport);
+            console.log(`No valid existing report found, saving new report with ${generatedReport.orders.length} orders`);
+          }
+        } catch (err) {
+          console.error('Error merging with existing report, saving new report instead:', err);
+          await updateReportData(generatedReport);
         }
       } else {
-        // If report-data.json doesn't exist, just save the generated report
-        fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
-        console.log(`No existing report found, saved generated report to ${reportDataFile}`);
+        // If report doesn't exist, just save the generated report
+        await updateReportData(generatedReport);
+        console.log(`No existing report found, saving new report with ${generatedReport.orders.length} orders`);
       }
-      
-      console.log('Report automatically generated after file conversion');
-    } catch (reportError) {
-      console.error('Error generating report:', reportError);
+    } catch (err) {
+      console.error('Error generating report:', err);
+      // Continue with the response even if report generation fails
     }
     
-    // Delete the original uploaded Excel file if using disk storage
-    if (!isVercel && req.file && req.file.path) {
+    // Delete the uploaded file after processing if we're using disk storage
+    if (!isVercel && filePath && fs.existsSync(filePath)) {
       try {
-        fs.unlinkSync(req.file.path);
-        console.log(`Deleted uploaded Excel file: ${req.file.path}`);
-      } catch (deleteError) {
-        console.error('Error deleting uploaded Excel file:', deleteError);
+        fs.unlinkSync(filePath);
+        console.log(`Successfully deleted uploaded file: ${filePath}`);
+      } catch (deleteErr) {
+        console.error(`Warning: Failed to delete uploaded file ${filePath}:`, deleteErr);
+        // Continue even if file deletion fails
       }
     }
     
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: shouldAppend ? 'File processed and data appended successfully' : 'File converted successfully and report generated',
-      fileName: outputFilename,
+      fileName: 'orderData.json',
       totalRows: jsonData.length,
       filteredRows: newDataCount,
       addedRows: shouldAppend ? newDataCount - duplicateCount : newDataCount,
@@ -303,145 +319,24 @@ app.post('/convert', upload.single('excelFile'), (req, res) => {
       originalFileName: req.file.originalname
     });
   } catch (error) {
-    console.error('Error converting file:', error);
+    console.error('Error processing file:', error);
     
-    // Clean up the uploaded file in case of error (only for disk storage)
-    if (!isVercel && req.file && req.file.path) {
+    // Make sure to clean up the uploaded file in case of errors
+    if (!isVercel && req.file && req.file.path && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
-        console.log(`Deleted uploaded Excel file after error: ${req.file.path}`);
-      } catch (deleteError) {
-        console.error('Error deleting uploaded Excel file:', deleteError);
+        console.log(`Deleted uploaded file after error: ${req.file.path}`);
+      } catch (deleteErr) {
+        console.error(`Warning: Failed to delete uploaded file ${req.file.path}:`, deleteErr);
       }
     }
     
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// API endpoint to convert a specific Excel file in the directory
-app.get('/convert-file', (req, res) => {
-  try {
-    const fileName = req.query.file;
-    
-    if (!fileName) {
-      return res.status(400).json({ error: 'No filename provided' });
-    }
-    
-    const filePath = path.join(__dirname, fileName);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-    
-    const workbook = XLSX.readFile(filePath);
-    
-    // Get the first sheet name
-    const sheetName = workbook.SheetNames[0];
-    
-    // Convert sheet to JSON
-    const worksheet = workbook.Sheets[sheetName];
-    let jsonData = XLSX.utils.sheet_to_json(worksheet);
-    
-    // Filter out orders with status "Batal"
-    const filteredByStatus = filterCanceledOrders(jsonData);
-    
-    // Filter and keep only necessary fields
-    const filteredData = filterNecessaryFields(filteredByStatus);
-    
-    // Use standard output filename instead of original filename
-    const outputFilename = 'orderData.json';
-    const outputPath = path.join(__dirname, outputFilename);
-    
-    // Write JSON to file
-    fs.writeFileSync(outputPath, JSON.stringify(filteredData, null, 2));
-    
-    // Automatically generate report using the newly created JSON file
-    try {
-      // Instead of replacing report-data.json, we'll append the data from orderData.json
-      const generatedReport = generateReport(outputPath);
-      
-      // After generating the report, we need to merge with existing report data
-      const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
-      
-      // If report-data.json exists, we'll merge with it
-      if (fs.existsSync(reportDataFile)) {
-        console.log('Existing report-data.json found, merging with new data');
-        
-        try {
-          // Read existing report data
-          const existingReport = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
-          
-          // Create a map of existing order numbers to prevent duplicates
-          const existingOrderMap = new Map();
-          existingReport.orders.forEach(order => {
-            const key = `${order.orderNumber}-${order.productName}`;
-            existingOrderMap.set(key, true);
-          });
-          
-          // Filter out duplicates from the generated report
-          const uniqueNewOrders = generatedReport.orders.filter(order => {
-            const key = `${order.orderNumber}-${order.productName}`;
-            return !existingOrderMap.has(key);
-          });
-          
-          console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
-          
-          // Merge orders
-          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
-          
-          // Recalculate summary
-          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
-          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
-          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
-          
-          const mergedReport = {
-            summary: {
-              totalOrders: mergedOrders.length,
-              totalEarnings: totalEarnings,
-              averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
-            },
-            orders: mergedOrders
-          };
-          
-          // Save the merged report
-          fs.writeFileSync(reportDataFile, JSON.stringify(mergedReport, null, 2));
-          console.log(`Successfully merged data into ${reportDataFile}`);
-        } catch (mergeError) {
-          console.error('Error merging with existing report data:', mergeError);
-          
-          // If there's an error merging, just save the generated report as is
-          fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
-          console.log(`Error merging, saved generated report to ${reportDataFile}`);
-        }
-      } else {
-        // If report-data.json doesn't exist, just save the generated report
-        fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
-        console.log(`No existing report found, saved generated report to ${reportDataFile}`);
-      }
-      
-      console.log('Report automatically generated after file conversion');
-    } catch (reportError) {
-      console.error('Error generating report:', reportError);
-    }
-    
-    res.json({ 
-      success: true, 
-      message: 'File converted successfully and report generated',
-      fileName: outputFilename,
-      totalRows: jsonData.length,
-      filteredRows: filteredData.length,
-      removedRows: jsonData.length - filteredByStatus.length,
-      originalFileName: fileName
-    });
-  } catch (error) {
-    console.error('Error converting file:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // API endpoint to save products catalog
-app.post('/api/products', (req, res) => {
+app.post('/api/products', async (req, res) => {
   try {
     const productCatalog = req.body;
     
@@ -453,25 +348,18 @@ app.post('/api/products', (req, res) => {
     // Update timestamp
     productCatalog.last_updated = new Date().toISOString();
     
-    // Create backup of the existing file
-    const catalogPath = path.join(__dirname, 'products-catalog.json');
-    if (fs.existsSync(catalogPath)) {
-      const backupPath = path.join(__dirname, `products-catalog.backup.${Date.now()}.json`);
-      fs.copyFileSync(catalogPath, backupPath);
-      console.log(`Backup created: ${backupPath}`);
+    // Make a backup of the existing catalog in MongoDB if it exists
+    const existingCatalog = await getData(COLLECTIONS.PRODUCTS);
+    if (existingCatalog) {
+      // Create a backup with timestamp
+      const timestamp = Date.now();
+      await saveData(`${COLLECTIONS.PRODUCTS}_backup_${timestamp}`, existingCatalog);
+      console.log(`Backup of product catalog created in MongoDB: ${COLLECTIONS.PRODUCTS}_backup_${timestamp}`);
     }
     
-    // Save to file
-    fs.writeFileSync(catalogPath, JSON.stringify(productCatalog, null, 2));
-    console.log(`Products catalog saved: ${catalogPath}`);
-    
-    // Create a copy in the prodlist directory if it exists
-    const prodlistDir = path.join(__dirname, 'prodlist');
-    if (fs.existsSync(prodlistDir)) {
-      const prodlistPath = path.join(prodlistDir, 'products-catalog.json');
-      fs.writeFileSync(prodlistPath, JSON.stringify(productCatalog, null, 2));
-      console.log(`Products catalog also saved to: ${prodlistPath}`);
-    }
+    // Save the new catalog to MongoDB
+    await saveData(COLLECTIONS.PRODUCTS, productCatalog);
+    console.log(`Product catalog updated in MongoDB with ${productCatalog.products.length} products`);
     
     res.json({ 
       success: true, 
@@ -484,109 +372,137 @@ app.post('/api/products', (req, res) => {
   }
 });
 
-// API endpoint to list all Excel files in the directory
-app.get('/files', (req, res) => {
-  const files = fs.readdirSync(__dirname)
-    .filter(file => file.endsWith('.xlsx') || file.endsWith('.xls'))
-    .map(file => ({
-      name: file,
-      path: path.join(__dirname, file)
-    }));
-  
-  res.json(files);
+// Route for updating product catalog
+app.post('/update-catalog', async (req, res) => {
+  try {
+    const { productCatalog } = req.body;
+    
+    if (!productCatalog || !productCatalog.products) {
+      return res.status(400).json({ error: 'Invalid product catalog data' });
+    }
+    
+    // Make a backup of the existing catalog in MongoDB if it exists
+    const existingCatalog = await getData(COLLECTIONS.PRODUCTS);
+    if (existingCatalog) {
+      // Create a backup with timestamp
+      const timestamp = Date.now();
+      await saveData(`${COLLECTIONS.PRODUCTS}_backup_${timestamp}`, existingCatalog);
+      console.log(`Backup of product catalog created in MongoDB: ${COLLECTIONS.PRODUCTS}_backup_${timestamp}`);
+    }
+    
+    // Save the new catalog to MongoDB
+    await saveData(COLLECTIONS.PRODUCTS, productCatalog);
+    console.log(`Product catalog updated in MongoDB with ${productCatalog.products.length} products`);
+    
+    res.json({
+      success: true,
+      message: `Product catalog updated with ${productCatalog.products.length} products.`
+    });
+  } catch (error) {
+    console.error('Error updating product catalog:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
-// API endpoint for manual order entry (form submission)
-app.post('/manual-entry', upload.none(), (req, res) => {
+// Route to get list of uploaded files
+app.get('/files', async (req, res) => {
   try {
-    // Debug request body
-    console.log('Manual entry request body keys:', Object.keys(req.body));
-    
-    // Parse the manual entry data from the form
-    let manualData;
+    // Instead of listing local files, we'll return collections
+    let client;
     
     try {
-      if (!req.body.manualData) {
-        console.error('Error: No manual data found in request');
-        return res.status(400).json({ 
-          success: false, 
-          error: 'No manual data found in request'
-        });
-      }
+      const { MongoClient } = require('mongodb');
+      client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
       
-      // Log the raw data for debugging
-      console.log('Manual entry raw data (first 100 chars):', req.body.manualData.substring(0, 100) + '...');
-      manualData = JSON.parse(req.body.manualData);
-    } catch (parseError) {
-      console.error('Error parsing manual entry data:', parseError, 'Data received:', req.body.manualData);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid JSON data format: ' + parseError.message
+      const db = client.db('myApp');
+      const collections = await db.listCollections().toArray();
+      
+      // Map to more user-friendly format
+      const files = collections.map(collection => {
+        return {
+          name: collection.name,
+          type: 'collection',
+          createdAt: new Date(),
+        };
       });
+      
+      res.json(files);
+    } catch (err) {
+      console.error('Error listing MongoDB collections:', err);
+      res.status(500).json({ error: 'Failed to list collections' });
+    } finally {
+      if (client) await client.close();
+    }
+  } catch (error) {
+    console.error('Error listing collections:', error);
+    res.status(500).json({ error: 'Failed to list collections' });
+  }
+});
+
+// Handle manual entry of order data
+app.post('/manual-entry', async (req, res) => {
+  try {
+    const { orders, appendData = true } = req.body;
+    
+    if (!orders || !Array.isArray(orders)) {
+      return res.status(400).json({ success: false, error: 'Invalid order data format' });
     }
     
-    if (!manualData || !Array.isArray(manualData) || manualData.length === 0) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'No valid data provided or empty array'
-      });
+    // For debugging
+    console.log(`Received manual entry data: ${JSON.stringify(orders[0], null, 2).substring(0, 300)}...`);
+    
+    // Path to the report data file
+    console.log(`Processing ${orders.length} manually entered orders (Append mode: ${appendData})`);
+    
+    // Get product catalog from MongoDB
+    const productsCatalog = await getData(COLLECTIONS.PRODUCTS);
+    if (!productsCatalog || !productsCatalog.products) {
+      return res.status(404).json({ success: false, error: 'Product catalog not found or invalid' });
     }
     
-    // Path to the report data file (not orderData.json)
-    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
-    
-    // Check if we should append or replace (default is replace)
-    const shouldAppend = req.body.appendData === 'true';
-    
-    // Get the count of new records for reporting
-    const newDataCount = manualData.length;
-    let existingDataCount = 0;
-    let duplicateCount = 0;
-    
-    // Process the new entries directly into the report format
-    const processedEntries = [];
-    
-    manualData.forEach(entry => {
-      try {
-        // Extract data from entry
-        const orderDate = entry["Waktu Pembayaran Dilakukan"];
-        const orderNumber = entry["No. Pesanan"];
-        const productName = entry["Nama Produk"];
-        const variationName = entry["Nama Variasi"] || "";
-        const quantity = parseInt(entry["Jumlah"]) || 1;
-        const sellingPricePerUnit = parseFloat(entry["Harga Setelah Diskon"]) || 0;
-        const mpFee = parseFloat(entry["MP Fee Manual"]) || 0;
-        const voucher = parseFloat(entry["Voucher Ditanggung Penjual"]) || 0;
+    // Process manual orders
+    try {
+      const processedOrders = orders.map(order => {
+        // Extract values from order data (handling both English and Indonesian property names)
+        const productName = order.productName || order["Nama Produk"] || '';
+        const variationName = order.variationName || order["Nama Variasi"] || '';
+        const orderNumber = order.orderNumber || order["No. Pesanan"] || '';
+        const orderDate = order.orderDate || order["Waktu Pembayaran Dilakukan"] || new Date().toISOString();
         
-        // Get product category and base price from catalog
-        const productsCatalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'products-catalog.json'), 'utf8'));
+        // Convert string values to appropriate types
+        const quantity = parseInt(order.quantity || order["Jumlah"]) || 1;
+        const sellingPrice = parseFloat(order.sellingPrice || order["Harga Setelah Diskon"]) || 0;
+        const mpFee = parseFloat(order.mpFee || order["MP Fee Manual"]) || 0;
+        const voucher = parseFloat(order.voucher || order["Voucher Ditanggung Penjual"]) || 0;
         
-        // Find base price
-        let basePrice = 0;
+        console.log(`Processing manual entry: ${orderNumber}, ${productName}, ${variationName}`);
+        
+        // Find product in catalog
         const product = productsCatalog.products.find(p => 
-          p.product_name === productName
-        );
+          p.product_name.toLowerCase() === productName.toLowerCase());
         
+        // Find variation
+        let basePrice = 0;
         if (product) {
           const variation = product.variations.find(v => 
-            v.name === variationName
-          );
+            v.name.toLowerCase() === variationName.toLowerCase());
           
           if (variation) {
             basePrice = variation.base_price;
-          } else if (product.variations.length > 0) {
-            basePrice = product.variations[0].base_price;
           }
+        } else {
+          console.warn(`Product not found in catalog: ${productName}`);
         }
         
         // Calculate derived fields
         const totalBasePrice = basePrice * quantity;
-        const subtotal = sellingPricePerUnit * quantity;
+        const subtotal = sellingPrice * quantity;
         const earnings = subtotal - mpFee - voucher;
         const margin = earnings - totalBasePrice;
         
-        // Create the processed order object in the report format
-        const processedEntry = {
+        // Create processed order object
+        return {
           orderDate: new Date(orderDate),
           orderNumber,
           productName,
@@ -594,160 +510,153 @@ app.post('/manual-entry', upload.none(), (req, res) => {
           quantity,
           basePrice,
           totalBasePrice,
-          sellingPrice: sellingPricePerUnit,
+          sellingPrice,
           subtotal,
           mpFee,
           voucher,
           earnings,
           margin
         };
+      });
+      
+      // Check if report data exists
+      const reportExists = await reportDataExists();
+      let updatedReport;
+      
+      if (reportExists) {
+        // Get existing report data
+        const existingReport = await getReportData();
         
-        processedEntries.push(processedEntry);
-      } catch (error) {
-        console.error(`Error processing manual entry: ${JSON.stringify(entry)}`, error);
-      }
-    });
-    
-    // Default report structure
-    let updatedReport = {
-      summary: {
-        totalOrders: processedEntries.length,
-        totalEarnings: 0,
-        averageMargin: 0
-      },
-      orders: processedEntries
-    };
-    
-    // If append mode and the file exists, read and merge with existing data
-    if (shouldAppend && fs.existsSync(reportDataFile)) {
-      try {
-        // Read existing report
-        const existingReportRaw = fs.readFileSync(reportDataFile);
-        const existingReport = JSON.parse(existingReportRaw);
-        
-        // Store the count for reporting
-        existingDataCount = existingReport.orders.length;
-        
-        // Create a map of existing order numbers for quick lookup
-        const existingOrderMap = new Map();
-        existingReport.orders.forEach(order => {
-          // Create a unique key using order number and product name
-          const key = `${order.orderNumber}-${order.productName}`;
-          existingOrderMap.set(key, true);
-        });
-        
-        // Filter out duplicates from the new data
-        const uniqueNewEntries = processedEntries.filter(order => {
-          const key = `${order.orderNumber}-${order.productName}`;
-          const isDuplicate = existingOrderMap.has(key);
+        if (existingReport && existingReport.orders) {
+          // Filter out any orders with the same order number as the manually entered ones
+          // (to handle updates to existing orders)
+          const manualOrderNumbers = processedOrders.map(o => o.orderNumber);
           
-          if (isDuplicate) {
-            duplicateCount++;
-            return false;
-          }
-          return true;
-        });
+          const filteredExistingOrders = existingReport.orders.filter(order => 
+            !manualOrderNumbers.includes(order.orderNumber));
+          
+          // Combine existing and new orders
+          const combinedOrders = [...filteredExistingOrders, ...processedOrders];
+          
+          // Recalculate summary
+          const totalEarnings = combinedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalMargin = combinedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
+          // Create updated report
+          updatedReport = {
+            generatedAt: new Date(),
+            summary: {
+              totalOrders: combinedOrders.length,
+              totalEarnings,
+              averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+            },
+            orders: combinedOrders
+          };
+        } else {
+          // Create new report with just the manual orders
+          const totalEarnings = processedOrders.reduce((sum, order) => sum + order.earnings, 0);
+          const totalMargin = processedOrders.reduce((sum, order) => sum + order.margin, 0);
+          
+          updatedReport = {
+            generatedAt: new Date(),
+            summary: {
+              totalOrders: processedOrders.length,
+              totalEarnings,
+              averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+            },
+            orders: processedOrders
+          };
+        }
+      } else {
+        // Create new report with just the manual orders
+        const totalEarnings = processedOrders.reduce((sum, order) => sum + order.earnings, 0);
+        const totalMargin = processedOrders.reduce((sum, order) => sum + order.margin, 0);
         
-        // Combine the datasets
-        updatedReport.orders = [...existingReport.orders, ...uniqueNewEntries];
-        
-        console.log(`Appending manual data: ${existingDataCount} existing records, ${uniqueNewEntries.length} new records added, ${duplicateCount} duplicates skipped`);
-      } catch (err) {
-        console.error('Error reading existing report data, will replace instead:', err);
-        // Just use the new data if there's an error
+        updatedReport = {
+          generatedAt: new Date(),
+          summary: {
+            totalOrders: processedOrders.length,
+            totalEarnings,
+            averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+          },
+          orders: processedOrders
+        };
       }
-    } else {
-      console.log(`Creating new report with ${processedEntries.length} manual entries`);
+      
+      // Save updated report to MongoDB
+      await updateReportData(updatedReport);
+      console.log(`Manual entry data saved to MongoDB with ${updatedReport.orders.length} orders`);
+      
+      res.json({
+        success: true,
+        message: `${processedOrders.length} manual orders saved successfully.`,
+        count: processedOrders.length
+      });
+    } catch (error) {
+      console.error('Error processing manual entry:', error);
+      res.status(500).json({ success: false, error: error.message });
     }
-    
-    // Recalculate summary
-    let totalEarnings = 0;
-    let totalSubtotal = 0;
-    let totalMargin = 0;
-    
-    updatedReport.orders.forEach(order => {
-      totalEarnings += order.earnings;
-      totalSubtotal += order.subtotal;
-      totalMargin += order.margin;
-    });
-    
-    updatedReport.summary = {
-      totalOrders: updatedReport.orders.length,
-      totalEarnings: totalEarnings,
-      averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
-    };
-    
-    // Write report directly to report-data.json
-    fs.writeFileSync(reportDataFile, JSON.stringify(updatedReport, null, 2));
-    console.log(`Manual entry data saved directly to report-data.json with ${updatedReport.orders.length} orders`);
-    
-    res.json({
-      success: true,
-      message: shouldAppend ? 'Manual entries added successfully' : 'Manual entries saved successfully',
-      totalEntries: newDataCount,
-      addedEntries: shouldAppend ? newDataCount - duplicateCount : newDataCount,
-      existingEntries: existingDataCount,
-      duplicateSkipped: duplicateCount,
-      appendMode: shouldAppend
-    });
   } catch (error) {
-    console.error('Error processing manual entries:', error);
+    console.error('Error handling manual entry:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// API endpoint to delete specific orders by order number
-app.post('/delete-orders', (req, res) => {
+// API endpoint to delete orders from the report
+app.post('/delete-orders', async (req, res) => {
   try {
-    console.log('Delete orders request received');
-    const orderNumbers = req.body.orderNumbers;
+    const { orderNumbers } = req.body;
     
     if (!orderNumbers || !Array.isArray(orderNumbers) || orderNumbers.length === 0) {
       return res.status(400).json({ success: false, error: 'Invalid order numbers provided' });
     }
     
-    // Define the report data file path
-    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+    // Get existing report data from MongoDB
+    const reportData = await getReportData();
     
-    // Check if the file exists
-    if (!fs.existsSync(reportDataFile)) {
-      return res.status(404).json({ success: false, error: 'Report data file not found' });
+    if (!reportData || !reportData.orders) {
+      return res.status(404).json({ success: false, error: 'Report data not found' });
     }
     
-    // Read existing data
-    const reportData = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
+    // Save the deleted order numbers to the deleted orders collection
+    let deletedOrdersList = await getData(COLLECTIONS.DELETED_ORDERS) || [];
     
-    // Make a backup of the file
-    const backupFile = `${reportDataFile}.backup-${Date.now()}`;
-    fs.copyFileSync(reportDataFile, backupFile);
-    console.log(`Created backup at ${backupFile}`);
+    // Add the new deleted order numbers to the list (avoid duplicates)
+    orderNumbers.forEach(orderNumber => {
+      if (!deletedOrdersList.includes(orderNumber)) {
+        deletedOrdersList.push(orderNumber);
+      }
+    });
     
-    // Filter out the orders to be deleted
-    const originalCount = reportData.orders.length;
-    reportData.orders = reportData.orders.filter(order => !orderNumbers.includes(order.orderNumber));
-    const deletedCount = originalCount - reportData.orders.length;
+    // Save the updated deleted orders list
+    await saveData(COLLECTIONS.DELETED_ORDERS, deletedOrdersList);
     
-    // Update summary info
-    if (reportData.orders.length > 0) {
-      const totalEarnings = reportData.orders.reduce((sum, order) => sum + order.earnings, 0);
-      const totalSubtotal = reportData.orders.reduce((sum, order) => sum + order.subtotal, 0);
-      const totalMargin = reportData.orders.reduce((sum, order) => sum + order.margin, 0);
-      
-      reportData.summary = {
-        totalOrders: reportData.orders.length,
-        totalEarnings: totalEarnings,
-        averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
-      };
-    }
+    // Filter out the deleted orders from the report
+    const updatedOrders = reportData.orders.filter(order => !orderNumbers.includes(order.orderNumber));
     
-    // Save the updated data
-    fs.writeFileSync(reportDataFile, JSON.stringify(reportData, null, 2));
-    console.log(`Successfully deleted ${deletedCount} orders`);
+    // Recalculate summary
+    const totalEarnings = updatedOrders.reduce((sum, order) => sum + order.earnings, 0);
+    const totalMargin = updatedOrders.reduce((sum, order) => sum + order.margin, 0);
+    
+    // Create updated report object
+    const updatedReport = {
+      generatedAt: new Date(),
+      summary: {
+        totalOrders: updatedOrders.length,
+        totalEarnings,
+        averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+      },
+      orders: updatedOrders
+    };
+    
+    // Save updated report to MongoDB
+    await updateReportData(updatedReport);
     
     res.json({
       success: true,
-      deletedCount,
-      remainingCount: reportData.orders.length
+      message: `${orderNumbers.length} orders deleted successfully.`,
+      deletedCount: orderNumbers.length,
+      remainingCount: updatedOrders.length
     });
   } catch (error) {
     console.error('Error deleting orders:', error);
@@ -755,168 +664,58 @@ app.post('/delete-orders', (req, res) => {
   }
 });
 
-// API endpoint to manually generate report from latest JSON data
-app.get('/generate-report', (req, res) => {
+// API endpoint to create a backup of the report data
+app.post('/backup-report', async (req, res) => {
   try {
-    // Check if orderData.json exists
-    const orderDataFile = path.join(__dirname, 'orderData.json');
-    if (!fs.existsSync(orderDataFile)) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Order data file not found. Please upload an Excel file first.'
+    // Get report data from MongoDB
+    const reportData = await getReportData();
+    
+    if (!reportData) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report data not found'
       });
     }
-
-    // Generate report from orderData.json (this will create a new report object)
-    const generatedReport = generateReport(orderDataFile);
     
-    // After generating the report, we need to merge with existing report data
-    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+    // Create a backup with timestamp in a different collection
+    const timestamp = Date.now();
+    const backupCollectionName = `${COLLECTIONS.REPORT_DATA}_backup_${timestamp}`;
     
-    // If report-data.json exists (and it's different from what we just generated), we'll merge with it
-    if (fs.existsSync(reportDataFile)) {
-      console.log('Existing report-data.json found, merging with new data');
-      
-      try {
-        // Read existing report data
-        const existingReport = JSON.parse(fs.readFileSync(reportDataFile, 'utf8'));
-        
-        // Create a map of existing order numbers to prevent duplicates
-        const existingOrderMap = new Map();
-        existingReport.orders.forEach(order => {
-          const key = `${order.orderNumber}-${order.productName}`;
-          existingOrderMap.set(key, true);
-        });
-        
-        // Filter out duplicates from the generated report
-        const uniqueNewOrders = generatedReport.orders.filter(order => {
-          const key = `${order.orderNumber}-${order.productName}`;
-          return !existingOrderMap.has(key);
-        });
-        
-        console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
-        
-        // Only merge if there are unique new orders
-        if (uniqueNewOrders.length > 0) {
-          // Merge orders
-          const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
-          
-          // Recalculate summary
-          const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
-          const totalSubtotal = mergedOrders.reduce((sum, order) => sum + order.subtotal, 0);
-          const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
-          
-          const mergedReport = {
-            summary: {
-              totalOrders: mergedOrders.length,
-              totalEarnings: totalEarnings,
-              averageMargin: totalSubtotal > 0 ? (totalMargin / totalSubtotal) * 100 : 0
-            },
-            orders: mergedOrders
-          };
-          
-          // Save the merged report
-          fs.writeFileSync(reportDataFile, JSON.stringify(mergedReport, null, 2));
-          console.log(`Successfully merged data into ${reportDataFile}`);
-          
-          res.json({ 
-            success: true, 
-            message: `Report generated successfully. Added ${uniqueNewOrders.length} new orders.`,
-            summary: mergedReport.summary
-          });
-        } else {
-          // No new orders to add
-          res.json({ 
-            success: true, 
-            message: 'No new orders to add. Report remains unchanged.',
-            summary: existingReport.summary
-          });
-        }
-      } catch (mergeError) {
-        console.error('Error merging with existing report data:', mergeError);
-        
-        // If there's an error merging, use the generated report
-        fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
-        console.log(`Error merging, saved generated report to ${reportDataFile}`);
-        
-        res.json({ 
-          success: true, 
-          message: 'Report generated successfully (merge failed, created new report)',
-          summary: generatedReport.summary
-        });
-      }
-    } else {
-      // If report-data.json doesn't exist, just save the generated report
-      fs.writeFileSync(reportDataFile, JSON.stringify(generatedReport, null, 2));
-      console.log(`No existing report found, saved generated report to ${reportDataFile}`);
-      
-      res.json({ 
-        success: true, 
-        message: 'Report generated successfully',
-        summary: generatedReport.summary
-      });
-    }
-  } catch (error) {
-    console.error('Error generating report:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Endpoint to backup report data
-app.get('/backup-report', (req, res) => {
-  try {
-    // Path to the report data file
-    const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
+    // Save the backup to MongoDB
+    await saveData(backupCollectionName, reportData);
     
-    // Check if report-data.json exists
-    if (!fs.existsSync(reportDataFile)) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Report data file not found. No data to backup.'
-      });
-    }
-
-    // Create a timestamped backup file name
-    const timestamp = new Date().toISOString().replace(/:/g, '-');
-    const backupFile = path.join(__dirname, 'public', `report-data.backup.${timestamp}.json`);
-    
-    // Copy the report data to the backup file
-    fs.copyFileSync(reportDataFile, backupFile);
-    console.log(`Created backup of report data: ${backupFile}`);
-    
-    // Get backup file name without path for response
-    const backupFileName = path.basename(backupFile);
-    
-    res.json({ 
-      success: true, 
-      message: 'Report data backed up successfully',
-      backupFile: backupFileName
+    res.json({
+      success: true,
+      message: `Backup created successfully: ${backupCollectionName}`,
+      backupName: backupCollectionName,
+      timestamp: timestamp
     });
   } catch (error) {
-    console.error('Error backing up report data:', error);
+    console.error('Error creating backup:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Endpoint to refresh the report data
-app.get('/refresh-report', (req, res) => {
+// API endpoint to refresh report by regenerating it from order data
+app.post('/refresh-report', async (req, res) => {
   try {
-    // Check if orderData.json exists
-    const orderDataPath = path.join(__dirname, 'orderData.json');
-    if (!fs.existsSync(orderDataPath)) {
-      return res.status(404).json({ error: 'Order data file not found' });
+    // Get order data from MongoDB
+    const orderData = await getData(COLLECTIONS.ORDERS);
+    
+    if (!orderData || orderData.length === 0) {
+      return res.status(404).json({ error: 'Order data not found in database' });
     }
-
-    // Generate fresh report from order data
-    const generatedReport = generateReport(orderDataPath);
     
-    // Get count of orders in the generated report
-    const orderCount = generatedReport.orders.length;
+    // Generate fresh report
+    const report = await generateReport(orderData);
     
-    return res.json({ 
-      success: true, 
-      message: 'Report refreshed successfully',
-      totalOrders: orderCount
+    // Save to MongoDB
+    await updateReportData(report);
+    
+    return res.json({
+      success: true,
+      message: `Report refreshed successfully with ${report.orders.length} orders.`,
+      orderCount: report.orders.length
     });
   } catch (error) {
     console.error('Error refreshing report:', error);
@@ -924,153 +723,269 @@ app.get('/refresh-report', (req, res) => {
   }
 });
 
-// Serve the product catalog and fee rules directly
-app.get('/products-catalog.json', (req, res) => {
-  res.sendFile(path.join(__dirname, 'products-catalog.json'));
-});
-
-app.get('/mpfeerules.json', (req, res) => {
-  res.sendFile(path.join(__dirname, 'mpfeerules.json'));
-});
-
-// Handle blob upload
-app.post('/save-json-data', upload.single('jsonFile'), (req, res) => {
-  console.log('Save JSON data request received');
-  
-  // Define the report data file path
-  const reportDataFile = path.join(__dirname, 'public', 'report-data.json');
-  
-  if (!req.file) {
-    console.error('No file uploaded');
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  
+// API endpoint to serve products catalog
+app.get('/products-catalog.json', async (req, res) => {
   try {
-    let fileData;
-    
-    // Handle file based on storage type
-    if (isVercel) {
-      // For memory storage (Vercel)
-      fileData = req.file.buffer.toString('utf8');
-      console.log(`Read file data from buffer, length: ${fileData.length}`);
-    } else {
-      // For disk storage (local development)
-      const filePath = req.file.path;
-      console.log(`Uploaded file: ${filePath}, Size: ${req.file.size} bytes`);
-      
-      // Check if the file exists
-      if (!fs.existsSync(filePath)) {
-        console.error(`File does not exist at path: ${filePath}`);
-        return res.status(500).json({ error: 'File upload failed' });
-      }
-      
-      // Read the uploaded file
-      fileData = fs.readFileSync(filePath, 'utf8');
-      console.log(`Read file data, length: ${fileData.length}`);
+    const productCatalog = await getData(COLLECTIONS.PRODUCTS);
+    if (!productCatalog) {
+      return res.status(404).json({ error: 'Product catalog not found' });
     }
-    
-    console.log(`File data preview: ${fileData.substring(0, 100)}...`);
-    
-    // Parse JSON
-    let jsonData;
-    try {
-      jsonData = JSON.parse(fileData);
-      console.log('JSON parsed successfully');
-    } catch (parseError) {
-      console.error('Failed to parse JSON:', parseError);
-      
-      // Clean up the temp file if using disk storage
-      if (!isVercel && req.file && req.file.path) {
-        try { fs.unlinkSync(req.file.path); } catch (e) { console.error('Error deleting invalid file:', e); }
-      }
-      
-      return res.status(400).json({ error: 'Invalid JSON data' });
-    }
-    
-    // Validate that it has a proper structure with orders array and summary
-    if (!jsonData.orders || !Array.isArray(jsonData.orders)) {
-      console.error('Invalid data format: missing or invalid orders array');
-      
-      // Clean up the temp file if using disk storage
-      if (!isVercel && req.file && req.file.path) {
-        try { fs.unlinkSync(req.file.path); } catch (e) { console.error('Error deleting invalid file:', e); }
-      }
-      
-      return res.status(400).json({ error: 'Invalid data format: missing or invalid orders array' });
-    }
-    
-    // Write directly to the report data file (bypassing generateReport)
-    fs.writeFileSync(reportDataFile, JSON.stringify(jsonData, null, 2));
-    console.log(`Successfully saved data to ${reportDataFile}`);
-    
-    // Clean up the uploaded temp file if using disk storage
-    if (!isVercel && req.file && req.file.path) {
-      try { fs.unlinkSync(req.file.path); } catch (e) { console.error('Error deleting temp file:', e); }
-    }
-    
-    res.json({ success: true, message: 'Data saved successfully' });
+    res.json(productCatalog);
   } catch (error) {
-    console.error('Error processing uploaded file:', error);
-    
-    // Clean up the temp file if using disk storage
-    if (!isVercel && req.file && req.file.path) {
-      try { 
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
-      } catch (e) { 
-        console.error('Error deleting temp file:', e); 
-      }
-    }
-    
-    res.status(500).json({ error: 'Server error processing the upload', details: error.message });
+    console.error('Error serving product catalog:', error);
+    res.status(500).json({ error: 'Failed to retrieve product catalog' });
   }
 });
 
-// Diagnostic endpoint to check uploads directory
-app.get('/uploads-check', (req, res) => {
+app.get('/mpfeerules.json', async (req, res) => {
   try {
-    const uploadDir = path.join(__dirname, 'uploads');
-    const uploadExists = fs.existsSync(uploadDir);
+    const mpFeeRules = await getData(COLLECTIONS.MPFEE_RULES);
+    if (!mpFeeRules) {
+      return res.status(404).json({ error: 'MP Fee rules not found' });
+    }
+    res.json(mpFeeRules);
+  } catch (error) {
+    console.error('Error serving MP Fee rules:', error);
+    res.status(500).json({ error: 'Failed to retrieve MP Fee rules' });
+  }
+});
+
+// API endpoint to serve report data
+app.get('/report-data.json', async (req, res) => {
+  try {
+    // Set cache control headers to prevent caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     
-    // Try to create it if it doesn't exist
-    if (!uploadExists) {
-      try {
-        fs.mkdirSync(uploadDir, { recursive: true });
-        console.log('Created uploads directory');
-      } catch (createError) {
-        console.error('Error creating uploads directory:', createError);
-      }
+    const reportData = await getReportData();
+    if (!reportData) {
+      return res.status(404).json({ error: 'Report data not found' });
+    }
+    console.log(`Serving report data with ${reportData.orders ? reportData.orders.length : 0} orders`);
+    res.json(reportData);
+  } catch (error) {
+    console.error('Error serving report data:', error);
+    res.status(500).json({ error: 'Failed to retrieve report data' });
+  }
+});
+
+// Route for filtering JSON file by date range
+app.post('/filter-json', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.body;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'Both start and end dates are required' });
     }
     
-    // Check again after attempted creation
-    const dirExists = fs.existsSync(uploadDir);
+    console.log(`Filtering orders between ${startDate} and ${endDate}`);
     
-    // Try to write a test file
-    let canWrite = false;
-    if (dirExists) {
-      try {
-        const testFile = path.join(uploadDir, 'test.txt');
-        fs.writeFileSync(testFile, 'test');
-        fs.unlinkSync(testFile);
-        canWrite = true;
-      } catch (writeError) {
-        console.error('Error writing to uploads directory:', writeError);
+    // Get order data from MongoDB
+    const orderData = await getData(COLLECTIONS.ORDERS);
+    
+    if (!orderData || orderData.length === 0) {
+      return res.status(404).json({ error: 'Order data not found in database' });
+    }
+    
+    // Parse the date strings to Date objects
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Filter the data by date range
+    const filteredData = orderData.filter(order => {
+      // Get the payment date field
+      const paymentDate = new Date(order["Waktu Pembayaran Dilakukan"]);
+      
+      // Check if the payment date is within the range
+      return paymentDate >= start && paymentDate <= end;
+    });
+    
+    console.log(`Filtered ${filteredData.length} orders out of ${orderData.length} total`);
+    
+    // Save filtered data to MongoDB
+    await saveData(COLLECTIONS.ORDERS, filteredData);
+    
+    // Automatically generate report from the filtered data
+    try {
+      // Generate report using filtered data
+      const generatedReport = await generateReport(filteredData);
+      
+      // Check if report data exists in MongoDB
+      const reportExists = await reportDataExists();
+      
+      if (reportExists) {
+        console.log('Existing report data found in MongoDB, merging with new data');
+        
+        try {
+          // Get existing report data
+          const existingReport = await getReportData();
+          
+          if (existingReport && existingReport.orders) {
+            // Create a map of existing order numbers to prevent duplicates
+            const existingOrderMap = new Map();
+            existingReport.orders.forEach(order => {
+              const key = `${order.orderNumber}-${order.productName}`;
+              existingOrderMap.set(key, true);
+            });
+            
+            // Filter out duplicates from the generated report
+            const uniqueNewOrders = generatedReport.orders.filter(order => {
+              const key = `${order.orderNumber}-${order.productName}`;
+              return !existingOrderMap.has(key);
+            });
+            
+            console.log(`Merging ${uniqueNewOrders.length} unique new orders into existing report`);
+            
+            // Merge orders
+            const mergedOrders = [...existingReport.orders, ...uniqueNewOrders];
+            
+            // Recalculate summary
+            const totalEarnings = mergedOrders.reduce((sum, order) => sum + order.earnings, 0);
+            const totalMargin = mergedOrders.reduce((sum, order) => sum + order.margin, 0);
+            
+            // Create updated report object
+            const mergedReport = {
+              generatedAt: new Date(),
+              summary: {
+                totalOrders: mergedOrders.length,
+                totalEarnings,
+                averageMargin: totalEarnings > 0 ? (totalMargin / totalEarnings) * 100 : 0
+              },
+              orders: mergedOrders
+            };
+            
+            // Save merged report to MongoDB
+            await updateReportData(mergedReport);
+            
+            console.log(`Merged report saved to MongoDB with ${mergedOrders.length} orders`);
+          } else {
+            // If existing report doesn't have orders array, just save the generated report
+            await updateReportData(generatedReport);
+            console.log(`No valid existing report found, saving new report with ${generatedReport.orders.length} orders`);
+          }
+        } catch (err) {
+          console.error('Error merging with existing report, saving new report instead:', err);
+          await updateReportData(generatedReport);
+        }
+      } else {
+        // If report doesn't exist, just save the generated report
+        await updateReportData(generatedReport);
+        console.log(`No existing report found, saving new report with ${generatedReport.orders.length} orders`);
       }
+    } catch (err) {
+      console.error('Error generating report:', err);
+      // Continue with the response even if report generation fails
     }
     
     res.json({
-      uploadDirExists: dirExists,
-      canWrite: canWrite,
-      dirname: __dirname,
-      uploadPath: uploadDir
+      success: true,
+      message: `Filtered data saved successfully. ${filteredData.length} orders matched the date range.`,
+      filteredCount: filteredData.length,
+      totalCount: orderData.length
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error filtering data:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// Function to clean up old files in the uploads directory
+function cleanupUploadsDirectory() {
+  if (isVercel) return; // Skip cleanup on Vercel (using memory storage)
+  
+  // Clean uploads directory
+  const uploadsDir = path.join(__dirname, 'uploads');
+  
+  // Check if uploads directory exists
+  if (fs.existsSync(uploadsDir)) {
+    try {
+      // Get list of files in uploads directory
+      const files = fs.readdirSync(uploadsDir);
+      
+      // Current time
+      const now = new Date().getTime();
+      
+      // Check each file
+      files.forEach(file => {
+        const filePath = path.join(uploadsDir, file);
+        const stats = fs.statSync(filePath);
+        
+        // File age in milliseconds
+        const fileAge = now - stats.mtimeMs;
+        
+        // Delete files older than 1 hour (3600000 ms)
+        if (fileAge > 3600000) {
+          try {
+            fs.unlinkSync(filePath);
+            console.log(`Cleanup: Deleted old file ${file} from uploads (age: ${Math.round(fileAge/1000/60)} minutes)`);
+          } catch (err) {
+            console.error(`Cleanup: Failed to delete old file ${file}:`, err);
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error cleaning up uploads directory:', err);
+    }
+  }
+  
+  // Clean public directory backups
+  const publicDir = path.join(__dirname, 'public');
+  
+  if (fs.existsSync(publicDir)) {
+    try {
+      // Get list of files in public directory
+      const files = fs.readdirSync(publicDir);
+      
+      // Current time
+      const now = new Date().getTime();
+      
+      // Keep only the 2 most recent backup files
+      const backupFiles = files
+        .filter(file => file.startsWith('report-data.json.backup-'))
+        .sort((a, b) => {
+          // Sort by timestamp in filename, newest first
+          const timestampA = parseInt(a.split('backup-')[1]);
+          const timestampB = parseInt(b.split('backup-')[1]);
+          return timestampB - timestampA;
+        });
+      
+      // Delete all but the 2 most recent backups
+      if (backupFiles.length > 2) {
+        backupFiles.slice(2).forEach(file => {
+          const filePath = path.join(publicDir, file);
+          try {
+            fs.unlinkSync(filePath);
+            console.log(`Cleanup: Deleted old backup file ${file} (keeping only 2 most recent backups)`);
+          } catch (err) {
+            console.error(`Cleanup: Failed to delete backup file ${file}:`, err);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error cleaning up public directory backups:', err);
+    }
+  }
+}
+
+// Run cleanup when the server starts
+cleanupUploadsDirectory();
+
+// Schedule periodic cleanup (every hour)
+if (!isVercel) {
+  setInterval(cleanupUploadsDirectory, 3600000); // Run every hour
+}
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log(`Product Editor available at http://localhost:${port}/product-editor`);
-}); 
+});
+
+// Cleanup history:
+// The following files were moved to the backup directory as they're no longer needed:
+// - orderData.json - Raw order data that is now stored in MongoDB
+// - fix-endpoint.js - One-time script to fix API endpoints
+// - init-db.js - Database initialization script that has been run
+// - init-mongodb.js - Another DB initialization script that duplicates functionality
+// - order-report.html - Old version of the report template now in public/
+// - products-catalog.backup.*.json - Old catalog backups 

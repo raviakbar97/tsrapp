@@ -1005,7 +1005,12 @@
       
       // Set up refresh button
       document.getElementById('refresh-report').addEventListener('click', function() {
-        refreshReport();
+        // Show loading spinner or some indication
+        this.innerHTML = '<i class="fas fa-sync-alt fa-spin me-1"></i> Refreshing...';
+        this.disabled = true;
+        
+        // Force a complete page reload
+        window.location.reload();
       });
       
       // Set up back button
@@ -1197,10 +1202,10 @@
           uploadResult.innerHTML = resultHtml;
           uploadResult.className = 'alert alert-success';
           
-          // Reload the report data
+          // Instead of calling loadReportData(), schedule a full page reload after showing success message
           setTimeout(() => {
-            loadReportData();
-          }, 1000);
+            window.location.reload();
+          }, 1500);
         } else {
           // Show error message
           uploadResult.textContent = `Error: ${data.error}`;
@@ -1268,8 +1273,8 @@
     }
     
     function loadReportData() {
-      // Fetch report data
-      fetch('/report-data.json')
+      // Fetch report data with cache-busting parameter
+      fetch(`/report-data.json?_=${new Date().getTime()}`)
         .then(response => response.json())
         .then(data => {
           displayReport(data);
@@ -2426,12 +2431,22 @@
         const mpFee = parseFloat(row.querySelector('.entry-mpfee').value) || 0;
         const voucher = parseFloat(row.querySelector('.entry-voucher').value) || 0;
         
-        console.log(`Order ${orderNumber} - MP Fee (parsed): ${mpFee}, type: ${typeof mpFee}`);
-        
-        // Match the format expected by the backend (as in orderData.json)
+        // Return data in a format the server can understand (both English and Indonesian keys)
         return {
+          // English keys for server processing
+          orderDate: formatDateForBackend(orderDate),
+          orderNumber: orderNumber,
+          productName: productName,
+          variationName: variationName || productName,
+          quantity: quantity,
+          sellingPrice: price,
+          mpFee: mpFee,
+          voucher: voucher,
+          platform: platform,
+          
+          // Keep the Indonesian keys for backward compatibility
           "No. Pesanan": orderNumber,
-          "Status Pesanan": "Selesai", // Default to completed
+          "Status Pesanan": "Selesai", 
           "Waktu Pembayaran Dilakukan": formatDateForBackend(orderDate),
           "Nama Produk": productName,
           "Nama Variasi": variationName,
@@ -2439,7 +2454,7 @@
           "Jumlah": quantity,
           "Voucher Ditanggung Penjual": voucher,
           "Platform": platform,
-          "MP Fee Manual": mpFee // This will be used in the generateReport function
+          "MP Fee Manual": mpFee
         };
       });
       
@@ -2451,12 +2466,12 @@
         const jsonData = JSON.stringify(entriesToSave);
         
         // Prepare data for submission
-        const formData = new FormData();
-        formData.append('manualData', jsonData);
-        formData.append('appendData', isAppendMode ? 'true' : 'false');
+        // const formData = new FormData();
+        // formData.append('manualData', jsonData);
+        // formData.append('appendData', isAppendMode ? 'true' : 'false');
         
         // Log the data being sent (for debugging)
-        console.log('Sending manual entry data length:', jsonData.length);
+        console.log('Sending manual entry data:', entriesToSave.length, 'entries');
         
         // Create a controller for timeout
         const controller = new AbortController();
@@ -2465,7 +2480,13 @@
         // Send data to the server
         fetch('/manual-entry', {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            orders: entriesToSave,
+            appendData: isAppendMode
+          }),
           signal: controller.signal
         })
         .then(response => {
@@ -2495,10 +2516,10 @@
             document.getElementById('manual-entries').innerHTML = '';
             addManualEntryRow();
             
-            // Reload the report data
+            // Force a complete page reload after a brief delay
             setTimeout(() => {
-              loadReportData();
-            }, 1000);
+              window.location.reload();
+            }, 1500);
           } else {
             showManualEntryResult(`Error: ${data.error}`, 'danger');
           }

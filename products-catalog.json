@@ -1,6 +1,7 @@
 {
+  "_id": "6816f0e2334cd9196ec03fe4",
   "catalog_version": "1.0",
-  "last_updated": "2025-04-25T08:47:11.641Z",
+  "last_updated": "2025-05-04T04:47:50.796Z",
   "products_count": 23,
   "products": [
     {
@@ -77,7 +78,7 @@
         },
         {
           "name": "22 Oz Cup",
-          "base_price": 13750
+          "base_price": 13751
         }
       ]
     },

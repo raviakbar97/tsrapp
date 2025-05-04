@@ -13,5 +13,8 @@
     }
   ],
   "cleanUrls": false,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "env": {
+    "VERCEL": "1"
+  }
 }

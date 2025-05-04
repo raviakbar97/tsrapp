@@ -26,3 +26,11 @@ yarn-error.log
 !/public/uploads/.gitkeep
 /temp/*
 !/temp/.gitkeep
+
+# Backup files
+/backup/
+/public/report-data.json.backup-*
+/public/report-data.json.old
+/public/*.backup*
+*.backup.*
+*.backup-*
