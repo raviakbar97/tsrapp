@@ -1378,7 +1378,11 @@
       }
       
       // Sort orders by date (oldest to newest)
-      data.orders.sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate));
+      data.orders.sort((a, b) => {
+        const dateA = parseOrderDate(a.orderDate);
+        const dateB = parseOrderDate(b.orderDate);
+        return dateA - dateB;
+      });
       
       // Clear existing data
       tbody.innerHTML = '';
@@ -1422,6 +1426,8 @@
       
       // Process each order
       data.orders.forEach(order => {
+        const rowOrderDate = parseOrderDate(order.orderDate);
+        
         // Accumulate totals
         totalRevenueSummary += order.subtotal;
         totalMpFeeSummary += order.mpFee;
@@ -1448,8 +1454,8 @@
         
         // Prepare data for charts
         // Group by date (use date only, not time)
-        const orderDate = new Date(order.orderDate);
-        const dateKey = orderDate.toLocaleDateString('en-GB');
+        const chartOrderDate = parseOrderDate(order.orderDate);
+        const dateKey = `${chartOrderDate.getDate().toString().padStart(2, '0')}/${(chartOrderDate.getMonth()+1).toString().padStart(2, '0')}/${chartOrderDate.getFullYear()}`;
         
         if (!chartData.dates[dateKey]) {
           chartData.dates[dateKey] = {
@@ -1491,8 +1497,15 @@
         // Create new row for order table
         const row = document.createElement('tr');
         
+        // Correct date formatting and standardize date handling
+        const orderDate = parseOrderDate(order.orderDate);
+        // Make sure it's a valid date object
+        const formattedDate = !isNaN(orderDate.getTime()) 
+          ? `${orderDate.getDate().toString().padStart(2, '0')}/${(orderDate.getMonth()+1).toString().padStart(2, '0')}/${orderDate.getFullYear()} ${orderDate.getHours().toString().padStart(2, '0')}:${orderDate.getMinutes().toString().padStart(2, '0')}`
+          : "Invalid date";
+        
         row.innerHTML = `
-          <td>${new Date(order.orderDate).toLocaleDateString('en-GB')} ${new Date(order.orderDate).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}</td>
+          <td data-timestamp="${orderDate.getTime()}">${formattedDate}</td>
           <td>${order.orderNumber}</td>
           <td>${order.productName}</td>
           <td>${order.variationName}</td>
@@ -1927,15 +1940,22 @@
         const orderDate = new Date(order.orderDate);
         
         // Date range filter
-        if (dateFrom && new Date(dateFrom) > orderDate) {
-          return false;
+        if (dateFrom) {
+          const filterFromDate = new Date(dateFrom);
+          const orderDateTime = parseOrderDate(order.orderDate);
+          
+          if (filterFromDate > orderDateTime) {
+            return false;
+          }
         }
         
         if (dateTo) {
           // Add 1 day to dateTo to include the entire day
-          const endDate = new Date(dateTo);
-          endDate.setDate(endDate.getDate() + 1);
-          if (endDate < orderDate) {
+          const filterToDate = new Date(dateTo);
+          filterToDate.setDate(filterToDate.getDate() + 1);
+          
+          const orderDateTime = parseOrderDate(order.orderDate);
+          if (filterToDate < orderDateTime) {
             return false;
           }
         }
@@ -2639,6 +2659,43 @@
       const cacheBuster = Date.now() + '_' + Math.random().toString(36).substring(2, 15);
       console.log('Forcing hard reload with cache buster:', cacheBuster);
       window.location.href = window.location.pathname + '?reload=' + cacheBuster;
+    }
+
+    // Add this function near the top of the script section before it's used
+    // Helper function to ensure consistent date parsing
+    function parseOrderDate(dateString) {
+      try {
+        // First try direct date parsing (ISO format)
+        const date = new Date(dateString);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+        
+        // If that fails, try to parse other formats
+        // Common formats: YYYY-MM-DD HH:MM, DD/MM/YYYY HH:MM
+        if (dateString.includes('-')) {
+          // Likely ISO or similar format, already handled above
+          return date;
+        } else if (dateString.includes('/')) {
+          // Likely DD/MM/YYYY format
+          const parts = dateString.split(' ')[0].split('/');
+          const timeParts = dateString.split(' ')[1]?.split(':') || ['00', '00'];
+          // Assume DD/MM/YYYY
+          const day = parseInt(parts[0]);
+          const month = parseInt(parts[1]) - 1;
+          const year = parseInt(parts[2]);
+          const hour = parseInt(timeParts[0]);
+          const minute = parseInt(timeParts[1]);
+          
+          return new Date(year, month, day, hour, minute);
+        }
+        
+        // If all else fails, return the original date object
+        return date;
+      } catch (error) {
+        console.error('Date parsing error:', error, 'for date string:', dateString);
+        return new Date(0); // Return epoch date as fallback
+      }
     }
   </script>
 </body>
